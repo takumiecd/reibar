@@ -1,14 +1,18 @@
 use super::{CpuKernelArgs, KernelLaunchError};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+pub type CpuKernelFn = fn(&CpuKernelArgs) -> Result<(), KernelLaunchError>;
+
+#[derive(Debug, Clone)]
 pub struct CpuKernelMetadata {
     kernel_name: String,
+    kernel_fn: CpuKernelFn,
 }
 
 impl CpuKernelMetadata {
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<String>, kernel_fn: CpuKernelFn) -> Self {
         Self {
             kernel_name: name.into(),
+            kernel_fn,
         }
     }
 
@@ -16,16 +20,22 @@ impl CpuKernelMetadata {
         &self.kernel_name
     }
 
+    pub fn kernel_fn(&self) -> CpuKernelFn {
+        self.kernel_fn
+    }
+
     pub fn into_launcher(self) -> CpuKernelLauncher {
         CpuKernelLauncher {
             kernel_name: self.kernel_name,
+            kernel_fn: self.kernel_fn,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct CpuKernelLauncher {
     kernel_name: String,
+    kernel_fn: CpuKernelFn,
 }
 
 impl CpuKernelLauncher {
@@ -33,8 +43,11 @@ impl CpuKernelLauncher {
         &self.kernel_name
     }
 
-    pub fn launch(&self, _args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
-        // Placeholder: concrete kernel invocation will be wired by dispatcher/registry.
-        Ok(())
+    pub fn kernel_fn(&self) -> CpuKernelFn {
+        self.kernel_fn
+    }
+
+    pub fn launch(&self, args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
+        (self.kernel_fn)(args)
     }
 }

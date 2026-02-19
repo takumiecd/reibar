@@ -5,7 +5,7 @@ mod tag;
 
 pub use cpu::CpuExecution;
 pub use kernel::{
-    CpuKernelArgs, CpuKernelContext, CpuKernelLauncher, CpuKernelMetadata, KernelArgs,
+    CpuKernelArgs, CpuKernelContext, CpuKernelFn, CpuKernelLauncher, CpuKernelMetadata, KernelArgs,
     KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata,
 };
 pub use storage::{CpuStorage, Storage};
@@ -13,12 +13,24 @@ pub use tag::{Execution, ExecutionTag};
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use schema::{ArgKey, ArgRole, KernelArg};
 
     use super::{
         CpuKernelArgs, CpuKernelContext, CpuStorage, Execution, ExecutionTag, KernelContext,
-        KernelLauncher, KernelMetadata, Storage,
+        KernelLaunchError, KernelLauncher, KernelMetadata, Storage,
     };
+
+    static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    fn test_fill_kernel(args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
+        if args.len() == 0 {
+            return Ok(());
+        }
+        KERNEL_CALL_COUNT.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
 
     #[test]
     fn execution_tag_builds_cpu_execution() {
@@ -43,7 +55,9 @@ mod tests {
 
     #[test]
     fn kernel_metadata_builds_kernel_launcher() {
-        let metadata = KernelMetadata::cpu("fill_f32");
+        KERNEL_CALL_COUNT.store(0, Ordering::SeqCst);
+
+        let metadata = KernelMetadata::cpu("fill_f32", test_fill_kernel);
         assert_eq!(metadata.tag(), ExecutionTag::Cpu);
 
         let launcher = metadata.into_launcher();
@@ -75,6 +89,7 @@ mod tests {
                 assert!(args.require_storage(&input_key).is_ok());
                 cpu.launch(&args)
                     .expect("cpu kernel launcher should accept cpu kernel args");
+                assert_eq!(KERNEL_CALL_COUNT.load(Ordering::SeqCst), 1);
             }
         }
     }

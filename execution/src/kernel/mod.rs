@@ -4,18 +4,18 @@ mod cpu;
 
 pub use args::{CpuKernelArgs, KernelArgs};
 pub use context::{CpuKernelContext, KernelContext};
-pub use cpu::{CpuKernelLauncher, CpuKernelMetadata};
+pub use cpu::{CpuKernelFn, CpuKernelLauncher, CpuKernelMetadata};
 
 use crate::ExecutionTag;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum KernelMetadata {
     Cpu(CpuKernelMetadata),
 }
 
 impl KernelMetadata {
-    pub fn cpu(name: impl Into<String>) -> Self {
-        Self::Cpu(CpuKernelMetadata::new(name))
+    pub fn cpu(name: impl Into<String>, kernel_fn: CpuKernelFn) -> Self {
+        Self::Cpu(CpuKernelMetadata::new(name, kernel_fn))
     }
 
     pub fn tag(&self) -> ExecutionTag {
@@ -31,7 +31,7 @@ impl KernelMetadata {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum KernelLauncher {
     Cpu(CpuKernelLauncher),
 }

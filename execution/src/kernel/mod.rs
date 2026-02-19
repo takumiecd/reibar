@@ -1,7 +1,9 @@
 mod args;
+mod context;
 mod cpu;
 
 pub use args::{CpuKernelArgs, KernelArgs};
+pub use context::{CpuKernelContext, KernelContext};
 pub use cpu::{CpuKernelLauncher, CpuKernelMetadata};
 
 use crate::ExecutionTag;

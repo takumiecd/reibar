@@ -5,8 +5,8 @@ mod tag;
 
 pub use cpu::CpuExecution;
 pub use kernel::{
-    CpuKernelArgs, CpuKernelLauncher, CpuKernelMetadata, KernelArgs, KernelLaunchError,
-    KernelLauncher, KernelMetadata,
+    CpuKernelArgs, CpuKernelContext, CpuKernelLauncher, CpuKernelMetadata, KernelArgs,
+    KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata,
 };
 pub use storage::{CpuStorage, Storage};
 pub use tag::{Execution, ExecutionTag};
@@ -16,7 +16,8 @@ mod tests {
     use schema::{ArgKey, ArgRole, KernelArg};
 
     use super::{
-        CpuKernelArgs, CpuStorage, Execution, ExecutionTag, KernelLauncher, KernelMetadata, Storage,
+        CpuKernelArgs, CpuKernelContext, CpuStorage, Execution, ExecutionTag, KernelContext,
+        KernelLauncher, KernelMetadata, Storage,
     };
 
     #[test]
@@ -47,7 +48,8 @@ mod tests {
 
         let launcher = metadata.into_launcher();
         assert_eq!(launcher.tag(), ExecutionTag::Cpu);
-        let mut args = CpuKernelArgs::new();
+        let cpu_context = CpuKernelContext::new().with_worker_threads(4);
+        let mut args = CpuKernelArgs::new().with_context(cpu_context.clone());
         let input_key = ArgKey::new(ArgRole::Input, "dst");
         let alpha_key = ArgKey::new(ArgRole::Param, "alpha");
         let beta_key = ArgKey::new(ArgRole::Param, "beta");
@@ -63,6 +65,7 @@ mod tests {
             KernelLauncher::Cpu(cpu) => {
                 assert_eq!(cpu.kernel_name(), "fill_f32");
                 assert_eq!(args.len(), 3);
+                assert_eq!(args.context(), &cpu_context);
                 assert_eq!(
                     *args
                         .require_f32(&alpha_key)
@@ -74,5 +77,11 @@ mod tests {
                     .expect("cpu kernel launcher should accept cpu kernel args");
             }
         }
+    }
+
+    #[test]
+    fn kernel_context_tag_is_execution_specific() {
+        let context = KernelContext::cpu();
+        assert_eq!(context.tag(), ExecutionTag::Cpu);
     }
 }

@@ -4,7 +4,7 @@ pub use cpu::CpuKernelArgs;
 
 use crate::ExecutionTag;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KernelArgs {
     Cpu(CpuKernelArgs),
 }

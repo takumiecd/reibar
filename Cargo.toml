@@ -3,5 +3,6 @@ members = [
     "api/tensor",
     "core/dense_impl",
     "execution",
+    "schema",
 ]
 resolver = "2"

@@ -13,6 +13,8 @@ pub use tag::{Execution, ExecutionTag};
 
 #[cfg(test)]
 mod tests {
+    use schema::{ArgKey, ArgRole, KernelArg};
+
     use super::{
         CpuKernelArgs, CpuStorage, Execution, ExecutionTag, KernelLauncher, KernelMetadata, Storage,
     };
@@ -45,15 +47,29 @@ mod tests {
 
         let launcher = metadata.into_launcher();
         assert_eq!(launcher.tag(), ExecutionTag::Cpu);
-        let args = CpuKernelArgs::new()
-            .with_storage_count(1)
-            .with_param_count(2);
+        let mut args = CpuKernelArgs::new();
+        let input_key = ArgKey::new(ArgRole::Input, "dst");
+        let alpha_key = ArgKey::new(ArgRole::Param, "alpha");
+        let beta_key = ArgKey::new(ArgRole::Param, "beta");
+
+        args.insert(KernelArg::storage(input_key.clone(), ()))
+            .expect("storage insertion should succeed");
+        args.insert(KernelArg::f32(alpha_key.clone(), 1.0))
+            .expect("alpha insertion should succeed");
+        args.insert(KernelArg::f32(beta_key.clone(), 2.0))
+            .expect("beta insertion should succeed");
 
         match launcher {
             KernelLauncher::Cpu(cpu) => {
                 assert_eq!(cpu.kernel_name(), "fill_f32");
-                assert_eq!(args.storage_count(), 1);
-                assert_eq!(args.param_count(), 2);
+                assert_eq!(args.len(), 3);
+                assert_eq!(
+                    *args
+                        .require_f32(&alpha_key)
+                        .expect("alpha must exist as f32"),
+                    1.0
+                );
+                assert!(args.require_storage(&input_key).is_ok());
                 cpu.launch(&args)
                     .expect("cpu kernel launcher should accept cpu kernel args");
             }

@@ -47,6 +47,10 @@ impl CpuKernelLauncher {
         self.kernel_fn
     }
 
+    pub fn to_metadata(&self) -> CpuKernelMetadata {
+        CpuKernelMetadata::new(self.kernel_name.clone(), self.kernel_fn)
+    }
+
     pub fn launch(&self, args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
         (self.kernel_fn)(args)
     }

@@ -1,10 +1,16 @@
 mod args;
 mod context;
 mod cpu;
+mod key;
+mod registry;
 
 pub use args::{CpuKernelArgs, KernelArgs};
 pub use context::{CpuKernelContext, KernelContext};
 pub use cpu::{CpuKernelFn, CpuKernelLauncher, CpuKernelMetadata};
+pub use key::KernelKey;
+pub use registry::{
+    KernelRegistry, KernelRegistryConfig, KernelRegistryError, KernelRegistryStats,
+};
 
 use crate::ExecutionTag;
 
@@ -48,6 +54,12 @@ impl KernelLauncher {
             Self::Cpu(launcher) => match args {
                 KernelArgs::Cpu(cpu_args) => launcher.launch(cpu_args),
             },
+        }
+    }
+
+    pub fn to_metadata(&self) -> KernelMetadata {
+        match self {
+            Self::Cpu(launcher) => KernelMetadata::Cpu(launcher.to_metadata()),
         }
     }
 }

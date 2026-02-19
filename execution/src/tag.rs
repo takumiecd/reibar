@@ -1,6 +1,6 @@
 use crate::CpuExecution;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ExecutionTag {
     Cpu,
 }

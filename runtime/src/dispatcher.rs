@@ -1,6 +1,8 @@
 use execution::{ExecutionTag, KernelArgs, KernelLaunchError, KernelMetadata};
 
-use crate::{KernelKey, KernelRegistry, KernelRegistryConfig, KernelRegistryError, OpTag};
+use crate::{
+    KernelKey, KernelRegistry, KernelRegistryConfig, KernelRegistryError, OpTag, ResolverKind,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchError {
@@ -18,13 +20,28 @@ pub enum DispatchError {
 #[derive(Debug, Clone, Default)]
 pub struct Dispatcher {
     registry: KernelRegistry,
+    resolver_kind: ResolverKind,
 }
 
 impl Dispatcher {
     pub fn new(config: KernelRegistryConfig) -> Self {
         Self {
             registry: KernelRegistry::new(config),
+            resolver_kind: ResolverKind::default(),
         }
+    }
+
+    pub fn with_resolver_kind(mut self, resolver_kind: ResolverKind) -> Self {
+        self.resolver_kind = resolver_kind;
+        self
+    }
+
+    pub fn resolver_kind(&self) -> ResolverKind {
+        self.resolver_kind
+    }
+
+    pub fn set_resolver_kind(&mut self, resolver_kind: ResolverKind) {
+        self.resolver_kind = resolver_kind;
     }
 
     pub fn register(
@@ -59,7 +76,12 @@ impl Dispatcher {
         op: OpTag,
         args: &KernelArgs,
     ) -> Result<(), DispatchError> {
-        self.dispatch(KernelKey::new(execution, op), args)
+        let key = self.resolve_key(execution, op, args);
+        self.dispatch(key, args)
+    }
+
+    pub fn resolve_key(&self, execution: ExecutionTag, op: OpTag, args: &KernelArgs) -> KernelKey {
+        self.resolver_kind.resolve(execution, op, args)
     }
 
     pub fn registry(&self) -> &KernelRegistry {

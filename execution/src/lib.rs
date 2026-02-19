@@ -1,16 +1,13 @@
 mod cpu;
 mod kernel;
-mod op;
 mod storage;
 mod tag;
 
 pub use cpu::CpuExecution;
 pub use kernel::{
     CpuKernelArgs, CpuKernelContext, CpuKernelFn, CpuKernelLauncher, CpuKernelMetadata, KernelArgs,
-    KernelContext, KernelKey, KernelLaunchError, KernelLauncher, KernelMetadata, KernelRegistry,
-    KernelRegistryConfig, KernelRegistryError, KernelRegistryStats,
+    KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata,
 };
-pub use op::OpTag;
 pub use storage::{CpuStorage, Storage};
 pub use tag::{Execution, ExecutionTag};
 
@@ -22,8 +19,7 @@ mod tests {
 
     use super::{
         CpuKernelArgs, CpuKernelContext, CpuStorage, Execution, ExecutionTag, KernelContext,
-        KernelKey, KernelLaunchError, KernelLauncher, KernelMetadata, KernelRegistry,
-        KernelRegistryConfig, OpTag, Storage,
+        KernelLaunchError, KernelLauncher, KernelMetadata, Storage,
     };
 
     static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -102,55 +98,5 @@ mod tests {
     fn kernel_context_tag_is_execution_specific() {
         let context = KernelContext::cpu();
         assert_eq!(context.tag(), ExecutionTag::Cpu);
-    }
-
-    #[test]
-    fn kernel_registry_uses_three_tiers() {
-        let mut registry = KernelRegistry::new(KernelRegistryConfig {
-            cache_capacity: 1,
-            main_memory_capacity: 1,
-        });
-
-        let fill_key = KernelKey::cpu(OpTag::Fill);
-        let copy_key = KernelKey::cpu(OpTag::Copy);
-
-        registry
-            .register(fill_key, KernelMetadata::cpu("fill_f32", test_fill_kernel))
-            .expect("fill kernel registration should succeed");
-        registry
-            .register(copy_key, KernelMetadata::cpu("copy_f32", test_fill_kernel))
-            .expect("copy kernel registration should succeed");
-
-        let first = registry
-            .select(&fill_key)
-            .expect("fill kernel should resolve from secondary storage");
-        match first {
-            KernelLauncher::Cpu(cpu) => assert_eq!(cpu.kernel_name(), "fill_f32"),
-        }
-        assert_eq!(registry.stats().secondary_hits, 1);
-
-        let second = registry
-            .select(&fill_key)
-            .expect("fill kernel should resolve from cache");
-        match second {
-            KernelLauncher::Cpu(cpu) => assert_eq!(cpu.kernel_name(), "fill_f32"),
-        }
-        assert_eq!(registry.stats().cache_hits, 1);
-
-        let third = registry
-            .select(&copy_key)
-            .expect("copy kernel should resolve from secondary storage");
-        match third {
-            KernelLauncher::Cpu(cpu) => assert_eq!(cpu.kernel_name(), "copy_f32"),
-        }
-        assert_eq!(registry.stats().secondary_hits, 2);
-
-        let fourth = registry
-            .select(&fill_key)
-            .expect("fill kernel should resolve from secondary after eviction");
-        match fourth {
-            KernelLauncher::Cpu(cpu) => assert_eq!(cpu.kernel_name(), "fill_f32"),
-        }
-        assert_eq!(registry.stats().secondary_hits, 3);
     }
 }

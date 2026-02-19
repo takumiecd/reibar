@@ -18,3 +18,4 @@ Work in progress.
 - `api/`: user-facing API layer
 - `core/`: concrete tensor implementations
 - `execution/`: runtime abstraction layer (design notes first)
+- `runtime/`: dispatcher and kernel registry orchestration

@@ -1,16 +1,10 @@
 mod args;
 mod context;
 mod cpu;
-mod key;
-mod registry;
 
 pub use args::{CpuKernelArgs, KernelArgs};
 pub use context::{CpuKernelContext, KernelContext};
 pub use cpu::{CpuKernelFn, CpuKernelLauncher, CpuKernelMetadata};
-pub use key::KernelKey;
-pub use registry::{
-    KernelRegistry, KernelRegistryConfig, KernelRegistryError, KernelRegistryStats,
-};
 
 use crate::ExecutionTag;
 

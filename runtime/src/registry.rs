@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 
-use crate::ExecutionTag;
+use execution::{ExecutionTag, KernelLauncher, KernelMetadata};
 
-use super::{KernelKey, KernelLauncher, KernelMetadata};
+use crate::KernelKey;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KernelRegistryConfig {

@@ -1,4 +1,6 @@
-use crate::{ExecutionTag, OpTag};
+use execution::ExecutionTag;
+
+use crate::OpTag;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KernelKey {

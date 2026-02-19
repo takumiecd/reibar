@@ -16,5 +16,5 @@
 
 ## Scope now
 
-- Directory and design notes only.
+- CPU execution and shared storage are implemented as the first concrete runtime pieces.
 - No `backends` layer yet.

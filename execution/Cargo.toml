@@ -1,7 +1,6 @@
 [package]
-name = "dense_impl"
+name = "execution"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-execution = { path = "../../execution" }

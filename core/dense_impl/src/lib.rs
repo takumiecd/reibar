@@ -1,4 +1,4 @@
-use execution::{ExecutionTag, Storage};
+use execution::{CpuStorage, ExecutionTag, Storage};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DenseTensorImpl {
@@ -20,7 +20,9 @@ impl DenseTensorImpl {
     }
 
     pub fn data(&self) -> &[f32] {
-        self.storage.as_slice()
+        match &self.storage {
+            Storage::Cpu(storage) => storage.as_slice(),
+        }
     }
 }
 
@@ -67,15 +69,13 @@ impl DenseBuilder {
                         actual: data.len(),
                     });
                 }
-                Storage::from_vec(self.execution_tag, data)
-            }
-            None => {
-                if self.fill_value == 0.0 {
-                    Storage::zeros(self.execution_tag, expected)
-                } else {
-                    Storage::filled(self.execution_tag, expected, self.fill_value)
+                match self.execution_tag {
+                    ExecutionTag::Cpu => Storage::Cpu(CpuStorage::from_vec(data)),
                 }
             }
+            None => match self.execution_tag {
+                ExecutionTag::Cpu => Storage::Cpu(CpuStorage::filled(expected, self.fill_value)),
+            },
         };
 
         Ok(DenseTensorImpl {

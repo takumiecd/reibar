@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "api/tensor",
+    "core/dense_impl",
+]
+resolver = "2"

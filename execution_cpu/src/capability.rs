@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CpuKernelContext {
+pub struct CpuCapability {
     worker_threads: usize,
 }
 
-impl CpuKernelContext {
+impl CpuCapability {
     pub fn new() -> Self {
         Self::default()
     }
@@ -18,7 +18,7 @@ impl CpuKernelContext {
     }
 }
 
-impl Default for CpuKernelContext {
+impl Default for CpuCapability {
     fn default() -> Self {
         Self { worker_threads: 1 }
     }

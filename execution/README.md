@@ -16,5 +16,11 @@
 
 ## Scope now
 
-- CPU execution and shared storage are implemented as the first concrete runtime pieces.
-- No `backends` layer yet.
+- CPU-specific components live in `execution_cpu`.
+- `execution` keeps backend-agnostic enums (`Execution`, `Storage`, `Kernel*`, `Capability`).
+
+## Backend Registration
+
+- Add backend mapping in one place: `execution/src/backend.rs`.
+- The `for_each_backend!` list is the single registration point.
+- `Execution/Storage/Kernel*/Capability` enums are expanded from that list.

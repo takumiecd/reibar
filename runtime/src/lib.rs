@@ -16,19 +16,21 @@ pub use resolver::{KeyResolver, ResolverKind, V1KeyResolver, V2KeyResolver};
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use execution::{CpuKernelArgs, ExecutionTag, KernelArgs, KernelLaunchError, KernelMetadata};
+    use execution::{
+        CpuKernelArgs, CpuKernelLaunchError, ExecutionTag, KernelArgs, KernelMetadata,
+    };
 
     use super::{Dispatcher, KernelKey, KernelRegistryConfig, KeyVersion, OpTag, ResolverKind};
 
     static KERNEL_CALL_COUNT_V1: AtomicUsize = AtomicUsize::new(0);
     static KERNEL_CALL_COUNT_V2: AtomicUsize = AtomicUsize::new(0);
 
-    fn test_fill_kernel_v1(_args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
+    fn test_fill_kernel_v1(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V1.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn test_fill_kernel_v2(_args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
+    fn test_fill_kernel_v2(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V2.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }

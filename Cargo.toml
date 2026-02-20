@@ -3,6 +3,7 @@ members = [
     "api/tensor",
     "core/dense_impl",
     "execution",
+    "execution_cpu",
     "runtime",
     "schema",
 ]

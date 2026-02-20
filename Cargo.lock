@@ -13,6 +13,14 @@ dependencies = [
 name = "execution"
 version = "0.1.0"
 dependencies = [
+ "execution_cpu",
+ "schema",
+]
+
+[[package]]
+name = "execution_cpu"
+version = "0.1.0"
+dependencies = [
  "schema",
 ]
 

@@ -1,14 +1,16 @@
-mod cpu;
+mod backend;
+mod capability;
 mod kernel;
 mod storage;
 mod tag;
 
-pub use cpu::CpuExecution;
-pub use kernel::{
-    CpuKernelArgs, CpuKernelContext, CpuKernelFn, CpuKernelLauncher, CpuKernelMetadata, KernelArgs,
-    KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata,
+pub use capability::Capability;
+pub use execution_cpu::{
+    CpuBundle, CpuCapability, CpuExecution, CpuKernelArgs, CpuKernelContext, CpuKernelFn,
+    CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata, CpuStorage,
 };
-pub use storage::{CpuStorage, Storage};
+pub use kernel::{KernelArgs, KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata};
+pub use storage::Storage;
 pub use tag::{Execution, ExecutionTag};
 
 #[cfg(test)]
@@ -18,13 +20,13 @@ mod tests {
     use schema::{ArgKey, ArgRole, KernelArg};
 
     use super::{
-        CpuKernelArgs, CpuKernelContext, CpuStorage, Execution, ExecutionTag, KernelContext,
-        KernelLaunchError, KernelLauncher, KernelMetadata, Storage,
+        Capability, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError, CpuStorage, Execution,
+        ExecutionTag, KernelContext, KernelLauncher, KernelMetadata, Storage,
     };
 
     static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-    fn test_fill_kernel(args: &CpuKernelArgs) -> Result<(), KernelLaunchError> {
+    fn test_fill_kernel(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         if args.len() == 0 {
             return Ok(());
         }
@@ -98,5 +100,11 @@ mod tests {
     fn kernel_context_tag_is_execution_specific() {
         let context = KernelContext::cpu();
         assert_eq!(context.tag(), ExecutionTag::Cpu);
+    }
+
+    #[test]
+    fn capability_follows_execution_tag() {
+        let capability = Capability::from_execution_tag(ExecutionTag::Cpu);
+        assert_eq!(capability.tag(), ExecutionTag::Cpu);
     }
 }

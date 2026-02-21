@@ -1,4 +1,4 @@
-use schema::{ArgKey, ArgKind, ArgRole, StorageValue};
+use schema::{ArgKey, ArgKind, ArgRole, DType, StorageValue};
 
 use crate::{CpuKernelArgs, CpuKernelLaunchError};
 
@@ -31,7 +31,15 @@ pub fn launch(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         ))
     })?;
 
+    if out_storage.dtype() != DType::F32 {
+        return Err(CpuKernelLaunchError::new(format!(
+            "cpu.fill requires output dtype F32, got {:?}",
+            out_storage.dtype()
+        )));
+    }
+
     out_storage
+        .buffer()
         .with_write_bytes(|out| {
             if out.len() % std::mem::size_of::<f32>() != 0 {
                 return Err(CpuKernelLaunchError::new(
@@ -51,29 +59,32 @@ pub fn launch(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
 
 #[cfg(test)]
 mod tests {
-    use schema::{ArgKey, ArgKind, ArgRole, KernelArg};
+    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
 
     use super::{launch, output_key, value_key};
-    use crate::{CpuKernelArgs, CpuStorage};
+    use crate::{CpuBuffer, CpuKernelArgs, CpuStorage};
 
     #[test]
     fn launch_accepts_expected_args() {
         let mut args = CpuKernelArgs::new();
-        let out = CpuStorage::new(vec![0u8; 16]);
+        let out = CpuStorage::new(CpuBuffer::new(vec![0u8; 16]), DType::F32);
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
         args.insert(KernelArg::f32(value_key(), 3.0))
             .expect("value insertion should succeed");
 
         launch(&args).expect("fill launch should validate arguments");
-        let values = out.with_read_bytes(decode_f32_vec);
+        let values = out.buffer().with_read_bytes(decode_f32_vec);
         assert_eq!(values, vec![3.0, 3.0, 3.0, 3.0]);
     }
 
     #[test]
     fn launch_rejects_missing_value() {
         let mut args = CpuKernelArgs::new();
-        args.insert(KernelArg::storage(output_key(), CpuStorage::new(vec![0u8; 8])))
+        args.insert(KernelArg::storage(
+            output_key(),
+            CpuStorage::new(CpuBuffer::new(vec![0u8; 8]), DType::F32),
+        ))
             .expect("out insertion should succeed");
 
         let err = launch(&args).expect_err("fill launch should fail without value");

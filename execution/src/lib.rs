@@ -7,9 +7,9 @@ mod tag;
 
 pub use capability::Capability;
 pub use execution_cpu::{
-    CpuBundle, CpuCapability, CpuExecution, CpuKernelArgs, CpuKernelContext, CpuKernelFn,
-    CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata, CpuStorage, CpuStorageAllocError,
-    CpuStorageContext,
+    CpuBuffer, CpuBundle, CpuCapability, CpuExecution, CpuKernelArgs, CpuKernelContext,
+    CpuKernelFn, CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata, CpuStorage,
+    CpuStorageAllocError, CpuStorageContext,
 };
 pub use contracts::*;
 pub use kernel::{KernelArgs, KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata};
@@ -20,12 +20,12 @@ pub use tag::{Execution, ExecutionTag};
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use schema::{ArgKey, ArgKind, ArgRole, KernelArg, StorageValue};
+    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, StorageValue};
 
     use super::{
-        Capability, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError, CpuKernelMetadata,
-        CpuStorage, Execution, ExecutionTag, KernelContext, KernelLauncher, KernelMetadata,
-        Storage, StorageContext, StorageRequest,
+        Capability, CpuBuffer, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError,
+        CpuKernelMetadata, CpuStorage, Execution, ExecutionTag, KernelContext, KernelLauncher,
+        KernelMetadata, Storage, StorageContext, StorageRequest,
     };
 
     static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -46,12 +46,16 @@ mod tests {
 
     #[test]
     fn storage_from_tag_is_cpu_storage() {
-        let storage = Storage::Cpu(CpuStorage::new(encode_f32_slice(&[2.5, 2.5, 2.5])));
+        let storage = Storage::Cpu(CpuStorage::new(
+            CpuBuffer::new(encode_f32_slice(&[2.5, 2.5, 2.5])),
+            DType::F32,
+        ));
         assert_eq!(storage.tag(), ExecutionTag::Cpu);
         assert_eq!(storage.len_bytes(), 12);
+        assert_eq!(storage.dtype(), DType::F32);
         match &storage {
             Storage::Cpu(cpu_storage) => {
-                let values = cpu_storage.with_read_bytes(decode_f32_vec);
+                let values = cpu_storage.buffer().with_read_bytes(decode_f32_vec);
                 assert_eq!(values, vec![2.5, 2.5, 2.5]);
             }
         }
@@ -66,12 +70,13 @@ mod tests {
         let storage = Storage::allocate(
             ExecutionTag::Cpu,
             &context,
-            StorageRequest::new(16).with_alignment(4),
+            StorageRequest::new(16, DType::F32),
         )
         .expect("storage allocation should succeed");
 
         assert_eq!(storage.tag(), ExecutionTag::Cpu);
         assert_eq!(storage.len_bytes(), 16);
+        assert_eq!(storage.dtype(), DType::F32);
     }
 
     #[test]
@@ -91,7 +96,7 @@ mod tests {
 
         args.insert(KernelArg::storage(
             input_key.clone(),
-            CpuStorage::new(vec![0u8; 4]),
+            CpuStorage::new(CpuBuffer::new(vec![0u8; 4]), DType::F32),
         ))
             .expect("storage insertion should succeed");
         args.insert(KernelArg::f32(alpha_key.clone(), 1.0))

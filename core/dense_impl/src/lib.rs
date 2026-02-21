@@ -8,7 +8,7 @@ use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, KernelArg};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
 
 #[derive(Debug, Clone)]
 pub struct DenseTensorImpl {
@@ -61,7 +61,10 @@ impl DenseTensorImpl {
 
     pub fn data(&self) -> Vec<f32> {
         match &self.storage {
-            Storage::Cpu(storage) => storage.with_read_bytes(decode_f32_vec),
+            Storage::Cpu(storage) => {
+                debug_assert_eq!(storage.dtype(), DType::F32);
+                storage.buffer().with_read_bytes(decode_f32_vec)
+            }
         }
     }
 }
@@ -130,7 +133,7 @@ impl DenseBuilder {
         let bytes = expected
             .checked_mul(std::mem::size_of::<f32>())
             .ok_or(DenseBuildError::ShapeOverflow)?;
-        let request = StorageRequest::new(bytes).with_alignment(std::mem::align_of::<f32>());
+        let request = StorageRequest::new(bytes, DType::F32);
         let storage_context = StorageContext::from_execution_tag(self.execution_tag);
         let storage = match self.data {
             Some(data) => {
@@ -144,7 +147,9 @@ impl DenseBuilder {
                     .map_err(DenseBuildError::StorageAlloc)?;
                 let encoded = encode_f32_slice(&data);
                 match &storage {
-                    Storage::Cpu(cpu) => cpu.with_write_bytes(|slice| slice.copy_from_slice(&encoded)),
+                    Storage::Cpu(cpu) => cpu
+                        .buffer()
+                        .with_write_bytes(|slice| slice.copy_from_slice(&encoded)),
                 }
                 storage
             }
@@ -153,7 +158,7 @@ impl DenseBuilder {
                     .map_err(DenseBuildError::StorageAlloc)?;
                 let pattern = self.fill_value.to_ne_bytes();
                 match &storage {
-                    Storage::Cpu(cpu) => cpu.with_write_bytes(|slice| {
+                    Storage::Cpu(cpu) => cpu.buffer().with_write_bytes(|slice| {
                         for chunk in slice.chunks_exact_mut(std::mem::size_of::<f32>()) {
                             chunk.copy_from_slice(&pattern);
                         }

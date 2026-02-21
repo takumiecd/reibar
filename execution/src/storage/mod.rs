@@ -4,6 +4,7 @@ pub use context::{StorageAllocError, StorageContext, StorageRequest};
 
 use crate::ExecutionTag;
 use crate::backend::{BackendBundle, for_each_backend};
+use schema::DType;
 
 macro_rules! define_storage_types {
     ($($variant:ident => $bundle:path),+ $(,)?) => {
@@ -22,6 +23,12 @@ macro_rules! define_storage_types {
             pub fn len_bytes(&self) -> usize {
                 match self {
                     $(Self::$variant(storage) => <$bundle as BackendBundle>::storage_len_bytes(storage)),+
+                }
+            }
+
+            pub fn dtype(&self) -> DType {
+                match self {
+                    $(Self::$variant(storage) => storage.dtype()),+
                 }
             }
 
@@ -44,6 +51,7 @@ macro_rules! define_storage_types {
                                 storage_context,
                                 request.bytes,
                                 request.alignment,
+                                request.dtype,
                             )
                             .map(Self::$variant)
                             .map_err(StorageAllocError::$variant)

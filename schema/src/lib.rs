@@ -1,5 +1,6 @@
 mod arg;
 mod args;
+mod dtype;
 mod error;
 mod key;
 mod role;
@@ -7,6 +8,7 @@ mod value;
 
 pub use arg::KernelArg;
 pub use args::KernelArgs;
+pub use dtype::DType;
 pub use error::KernelArgsError;
 pub use key::{ArgKey, ArgTag};
 pub use role::ArgRole;

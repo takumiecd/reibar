@@ -2,6 +2,7 @@ use execution_cpu::{
     CpuBundle, CpuCapability, CpuExecution, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError,
     CpuKernelLauncher, CpuKernelMetadata, CpuStorage, CpuStorageAllocError, CpuStorageContext,
 };
+use schema::DType;
 
 use crate::contracts::{
     ExecutionCapability, ExecutionKernelArgs, ExecutionKernelContext, ExecutionKernelLauncher,
@@ -32,6 +33,7 @@ pub trait BackendBundle {
         context: &Self::StorageContext,
         bytes: usize,
         alignment: Option<usize>,
+        dtype: DType,
     ) -> Result<Self::Storage, Self::StorageAllocError>;
     fn storage_len_bytes(storage: &Self::Storage) -> usize;
     fn metadata_into_launcher(metadata: Self::KernelMetadata) -> Self::KernelLauncher;
@@ -45,6 +47,10 @@ pub trait BackendBundle {
 impl ExecutionStorage for CpuStorage {
     fn len_bytes(&self) -> usize {
         self.len_bytes()
+    }
+
+    fn dtype(&self) -> DType {
+        self.dtype()
     }
 }
 
@@ -110,8 +116,9 @@ impl BackendBundle for CpuBundle {
         context: &Self::StorageContext,
         bytes: usize,
         alignment: Option<usize>,
+        dtype: DType,
     ) -> Result<Self::Storage, Self::StorageAllocError> {
-        CpuStorage::allocate(context, bytes, alignment)
+        CpuStorage::allocate(context, bytes, alignment, dtype)
     }
 
     fn storage_len_bytes(storage: &Self::Storage) -> usize {

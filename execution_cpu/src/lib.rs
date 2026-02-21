@@ -12,5 +12,5 @@ pub use kernel::{
     CpuKernelArgs, CpuKernelContext, CpuKernelFn, CpuKernelLaunchError, CpuKernelLauncher,
     CpuKernelMetadata,
 };
-pub use storage::{CpuStorage, CpuStorageAllocError};
+pub use storage::{CpuBuffer, CpuStorage, CpuStorageAllocError};
 pub use storage_context::CpuStorageContext;

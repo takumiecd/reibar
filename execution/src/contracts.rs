@@ -1,5 +1,8 @@
+use schema::DType;
+
 pub trait ExecutionStorage: Clone + Send + Sync + 'static {
     fn len_bytes(&self) -> usize;
+    fn dtype(&self) -> DType;
 }
 
 pub trait ExecutionStorageContext: Clone + Send + Sync + 'static {}

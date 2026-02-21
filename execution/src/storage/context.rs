@@ -1,16 +1,19 @@
 use crate::ExecutionTag;
 use crate::backend::{BackendBundle, for_each_backend};
+use schema::DType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StorageRequest {
     pub bytes: usize,
+    pub dtype: DType,
     pub alignment: Option<usize>,
 }
 
 impl StorageRequest {
-    pub fn new(bytes: usize) -> Self {
+    pub fn new(bytes: usize, dtype: DType) -> Self {
         Self {
             bytes,
+            dtype,
             alignment: None,
         }
     }

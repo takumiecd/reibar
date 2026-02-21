@@ -24,8 +24,8 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use execution::{
-        CpuKernelArgs, CpuKernelLaunchError, CpuKernelMetadata, ExecutionTag, KernelArgs,
-        KernelMetadata,
+        CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError, CpuKernelMetadata,
+        ExecutionTag, KernelArgs, KernelMetadata,
     };
 
     use super::{
@@ -40,27 +40,42 @@ mod tests {
     static KERNEL_CALL_COUNT_V2_ACCEPT: AtomicUsize = AtomicUsize::new(0);
     static KERNEL_CALL_COUNT_V2_MISMATCH: AtomicUsize = AtomicUsize::new(0);
 
-    fn test_fill_kernel_v1_connect(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+    fn test_fill_kernel_v1_connect(
+        _args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V1_CONNECT.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn test_fill_kernel_v1_fallback(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+    fn test_fill_kernel_v1_fallback(
+        _args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V1_FALLBACK.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn test_fill_kernel_v1_seed(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+    fn test_fill_kernel_v1_seed(
+        _args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V1_SEED.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn test_fill_kernel_v2_accept(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+    fn test_fill_kernel_v2_accept(
+        _args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V2_ACCEPT.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn test_fill_kernel_v2_mismatch(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+    fn test_fill_kernel_v2_mismatch(
+        _args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V2_MISMATCH.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }

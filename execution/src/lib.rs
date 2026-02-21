@@ -6,12 +6,12 @@ mod storage;
 mod tag;
 
 pub use capability::Capability;
+pub use contracts::*;
 pub use execution_cpu::{
     CpuBuffer, CpuBundle, CpuCapability, CpuExecution, CpuKernelArgs, CpuKernelContext,
-    CpuKernelFn, CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata, CpuStorage,
-    CpuStorageAllocError, CpuStorageContext,
+    CpuKernelEntrypoint, CpuKernelFn, CpuKernelLaunchConfig, CpuKernelLaunchError,
+    CpuKernelLauncher, CpuKernelMetadata, CpuStorage, CpuStorageAllocError, CpuStorageContext,
 };
-pub use contracts::*;
 pub use kernel::{KernelArgs, KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata};
 pub use storage::{Storage, StorageAllocError, StorageContext, StorageRequest};
 pub use tag::{Execution, ExecutionTag};
@@ -23,14 +23,17 @@ mod tests {
     use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, StorageValue};
 
     use super::{
-        Capability, CpuBuffer, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError,
-        CpuKernelMetadata, CpuStorage, Execution, ExecutionTag, KernelContext, KernelLauncher,
-        KernelMetadata, Storage, StorageContext, StorageRequest,
+        Capability, CpuBuffer, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchConfig,
+        CpuKernelLaunchError, CpuKernelMetadata, CpuStorage, Execution, ExecutionTag,
+        KernelContext, KernelLauncher, KernelMetadata, Storage, StorageContext, StorageRequest,
     };
 
     static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-    fn test_fill_kernel(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+    fn test_fill_kernel(
+        args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
         if args.len() == 0 {
             return Ok(());
         }
@@ -115,7 +118,7 @@ mod tests {
             )
             .expect("typed storage creation should succeed"),
         ))
-            .expect("storage insertion should succeed");
+        .expect("storage insertion should succeed");
         args.insert(KernelArg::f32(alpha_key.clone(), 1.0))
             .expect("alpha insertion should succeed");
         args.insert(KernelArg::f32(beta_key.clone(), 2.0))

@@ -9,8 +9,8 @@ pub use bundle::CpuBundle;
 pub use capability::CpuCapability;
 pub use execution::CpuExecution;
 pub use kernel::{
-    CpuKernelArgs, CpuKernelContext, CpuKernelFn, CpuKernelLaunchError, CpuKernelLauncher,
-    CpuKernelMetadata,
+    CpuKernelArgs, CpuKernelContext, CpuKernelEntrypoint, CpuKernelFn, CpuKernelLaunchConfig,
+    CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata,
 };
 pub use storage::{CpuBuffer, CpuStorage, CpuStorageAllocError};
 pub use storage_context::CpuStorageContext;

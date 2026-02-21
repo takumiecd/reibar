@@ -63,7 +63,6 @@ impl CpuKernelArgs {
     pub fn len(&self) -> usize {
         self.args.len()
     }
-
 }
 
 impl Default for CpuKernelArgs {
@@ -92,7 +91,56 @@ impl CpuKernelLaunchError {
     }
 }
 
-pub type CpuKernelFn = fn(&CpuKernelArgs) -> Result<(), CpuKernelLaunchError>;
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CpuKernelEntrypoint {
+    device_function: Option<String>,
+}
+
+impl CpuKernelEntrypoint {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_device_function(mut self, device_function: impl Into<String>) -> Self {
+        self.device_function = Some(device_function.into());
+        self
+    }
+
+    pub fn device_function(&self) -> Option<&str> {
+        self.device_function.as_deref()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CpuKernelLaunchConfig {
+    kernel_name: String,
+    entrypoint: CpuKernelEntrypoint,
+}
+
+impl CpuKernelLaunchConfig {
+    pub fn new(kernel_name: impl Into<String>) -> Self {
+        Self {
+            kernel_name: kernel_name.into(),
+            entrypoint: CpuKernelEntrypoint::new(),
+        }
+    }
+
+    pub fn with_entrypoint(mut self, entrypoint: CpuKernelEntrypoint) -> Self {
+        self.entrypoint = entrypoint;
+        self
+    }
+
+    pub fn kernel_name(&self) -> &str {
+        &self.kernel_name
+    }
+
+    pub fn entrypoint(&self) -> &CpuKernelEntrypoint {
+        &self.entrypoint
+    }
+}
+
+pub type CpuKernelFn =
+    fn(&CpuKernelArgs, &CpuKernelLaunchConfig) -> Result<(), CpuKernelLaunchError>;
 
 #[derive(Debug, Clone)]
 pub struct CpuKernelMetadata {
@@ -118,7 +166,7 @@ impl CpuKernelMetadata {
 
     pub fn into_launcher(self) -> CpuKernelLauncher {
         CpuKernelLauncher {
-            kernel_name: self.kernel_name,
+            launch_config: CpuKernelLaunchConfig::new(self.kernel_name),
             kernel_fn: self.kernel_fn,
         }
     }
@@ -126,13 +174,26 @@ impl CpuKernelMetadata {
 
 #[derive(Debug, Clone)]
 pub struct CpuKernelLauncher {
-    kernel_name: String,
+    launch_config: CpuKernelLaunchConfig,
     kernel_fn: CpuKernelFn,
 }
 
 impl CpuKernelLauncher {
     pub fn kernel_name(&self) -> &str {
-        &self.kernel_name
+        self.launch_config.kernel_name()
+    }
+
+    pub fn launch_config(&self) -> &CpuKernelLaunchConfig {
+        &self.launch_config
+    }
+
+    pub fn entrypoint(&self) -> &CpuKernelEntrypoint {
+        self.launch_config.entrypoint()
+    }
+
+    pub fn with_entrypoint(mut self, entrypoint: CpuKernelEntrypoint) -> Self {
+        self.launch_config = self.launch_config.with_entrypoint(entrypoint);
+        self
     }
 
     pub fn kernel_fn(&self) -> CpuKernelFn {
@@ -140,10 +201,10 @@ impl CpuKernelLauncher {
     }
 
     pub fn to_metadata(&self) -> CpuKernelMetadata {
-        CpuKernelMetadata::new(self.kernel_name.clone(), self.kernel_fn)
+        CpuKernelMetadata::new(self.kernel_name().to_string(), self.kernel_fn)
     }
 
     pub fn launch(&self, args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
-        (self.kernel_fn)(args)
+        (self.kernel_fn)(args, &self.launch_config)
     }
 }

@@ -1,6 +1,6 @@
 use schema::{ArgKey, ArgKind, ArgRole, DType, StorageValue};
 
-use crate::{CpuKernelArgs, CpuKernelLaunchError};
+use crate::{CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError};
 
 pub fn output_key() -> ArgKey {
     ArgKey::new(ArgRole::Output, "out", ArgKind::Storage)
@@ -10,7 +10,10 @@ pub fn value_key() -> ArgKey {
     ArgKey::new(ArgRole::Param, "value", ArgKind::F32)
 }
 
-pub fn launch(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+pub fn launch(
+    args: &CpuKernelArgs,
+    _launch_config: &CpuKernelLaunchConfig,
+) -> Result<(), CpuKernelLaunchError> {
     let out_key = output_key();
     let value_key = value_key();
 
@@ -38,21 +41,19 @@ pub fn launch(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         )));
     }
 
-    out_storage
-        .buffer()
-        .with_write_bytes(|out| {
-            if out.len() % std::mem::size_of::<f32>() != 0 {
-                return Err(CpuKernelLaunchError::new(
-                    "cpu.fill requires output byte-size to be multiple of f32 size",
-                ));
-            }
+    out_storage.buffer().with_write_bytes(|out| {
+        if out.len() % std::mem::size_of::<f32>() != 0 {
+            return Err(CpuKernelLaunchError::new(
+                "cpu.fill requires output byte-size to be multiple of f32 size",
+            ));
+        }
 
-            let pattern = value.to_ne_bytes();
-            for chunk in out.chunks_exact_mut(std::mem::size_of::<f32>()) {
-                chunk.copy_from_slice(&pattern);
-            }
-            Ok(())
-        })?;
+        let pattern = value.to_ne_bytes();
+        for chunk in out.chunks_exact_mut(std::mem::size_of::<f32>()) {
+            chunk.copy_from_slice(&pattern);
+        }
+        Ok(())
+    })?;
 
     Ok(())
 }
@@ -62,7 +63,7 @@ mod tests {
     use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
 
     use super::{launch, output_key, value_key};
-    use crate::{CpuBuffer, CpuKernelArgs, CpuStorage};
+    use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
 
     #[test]
     fn launch_accepts_expected_args() {
@@ -78,7 +79,8 @@ mod tests {
         args.insert(KernelArg::f32(value_key(), 3.0))
             .expect("value insertion should succeed");
 
-        launch(&args).expect("fill launch should validate arguments");
+        launch(&args, &CpuKernelLaunchConfig::new("cpu.fill"))
+            .expect("fill launch should validate arguments");
         let values = out.buffer().with_read_bytes(decode_f32_vec);
         assert_eq!(values, vec![3.0, 3.0, 3.0, 3.0]);
     }
@@ -95,9 +97,10 @@ mod tests {
             )
             .expect("typed storage creation should succeed"),
         ))
-            .expect("out insertion should succeed");
+        .expect("out insertion should succeed");
 
-        let err = launch(&args).expect_err("fill launch should fail without value");
+        let err = launch(&args, &CpuKernelLaunchConfig::new("cpu.fill"))
+            .expect_err("fill launch should fail without value");
         assert!(err.message().contains("value"));
 
         let missing = ArgKey::new(ArgRole::Param, "value", ArgKind::F32);

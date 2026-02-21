@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
-use execution::{ExecutionTag, KernelLauncher, KernelMetadata};
+use execution::{KernelLauncher, KernelMetadata};
 
 use crate::KernelKey;
 
@@ -27,14 +27,6 @@ pub struct KernelRegistryStats {
     pub misses: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KernelRegistryError {
-    ExecutionMismatch {
-        key: ExecutionTag,
-        value: ExecutionTag,
-    },
-}
-
 #[derive(Debug, Clone)]
 pub struct KernelRegistry {
     config: KernelRegistryConfig,
@@ -59,24 +51,12 @@ impl KernelRegistry {
         }
     }
 
-    pub fn register(
-        &mut self,
-        key: KernelKey,
-        metadata: KernelMetadata,
-    ) -> Result<(), KernelRegistryError> {
-        if key.execution() != metadata.tag() {
-            return Err(KernelRegistryError::ExecutionMismatch {
-                key: key.execution(),
-                value: metadata.tag(),
-            });
-        }
-
+    pub fn register(&mut self, key: KernelKey, metadata: KernelMetadata) {
         if self.contains(&key) {
-            return Ok(());
+            return;
         }
 
         self.secondary_storage.insert(key, metadata);
-        Ok(())
     }
 
     pub fn contains(&self, key: &KernelKey) -> bool {

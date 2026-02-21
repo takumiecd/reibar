@@ -1,47 +1,70 @@
-use execution::{ExecutionTag, KernelArgs, KernelLaunchError, KernelMetadata};
+use execution::{KernelArgs, KernelLaunchError, KernelMetadata};
 
-use crate::{
-    KernelKey, KernelRegistry, KernelRegistryConfig, KernelRegistryError, OpTag, ResolverKind,
-};
+use crate::version::{VersionError, next_fallback_key};
+use crate::{KernelKey, KernelRegistry, KernelRegistryStats, KeyError, KeyVersion, key_version};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DispatchError {
-    Registry(KernelRegistryError),
-    KernelNotFound {
+    KeyVersion(KeyError),
+    KeyVersionMismatch {
+        dispatcher: KeyVersion,
+        key: KeyVersion,
+    },
+    Version(VersionError),
+    FallbackLoop {
         key: KernelKey,
     },
-    ArgsExecutionMismatch {
-        key: ExecutionTag,
-        args: ExecutionTag,
+    FallbackOverflow {
+        seed: KernelKey,
+        max_steps: usize,
+    },
+    KernelNotFound {
+        key: KernelKey,
     },
     Launch(KernelLaunchError),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy)]
+pub struct DispatchRequest<'a> {
+    pub key: KernelKey,
+    pub args: &'a KernelArgs,
+}
+
+pub trait DispatchApi {
+    fn dispatch(&mut self, request: DispatchRequest<'_>) -> Result<(), DispatchError>;
+}
+
+#[derive(Debug, Clone)]
 pub struct Dispatcher {
     registry: KernelRegistry,
-    resolver_kind: ResolverKind,
+    version: KeyVersion,
+    max_fallback_steps: usize,
 }
 
 impl Dispatcher {
-    pub fn new(config: KernelRegistryConfig) -> Self {
+    pub fn new(config: crate::KernelRegistryConfig, version: KeyVersion) -> Self {
         Self {
             registry: KernelRegistry::new(config),
-            resolver_kind: ResolverKind::default(),
+            version,
+            max_fallback_steps: 16,
         }
     }
 
-    pub fn with_resolver_kind(mut self, resolver_kind: ResolverKind) -> Self {
-        self.resolver_kind = resolver_kind;
+    pub fn version(&self) -> KeyVersion {
+        self.version
+    }
+
+    pub fn set_version(&mut self, version: KeyVersion) {
+        self.version = version;
+    }
+
+    pub fn with_max_fallback_steps(mut self, max_fallback_steps: usize) -> Self {
+        self.max_fallback_steps = max_fallback_steps;
         self
     }
 
-    pub fn resolver_kind(&self) -> ResolverKind {
-        self.resolver_kind
-    }
-
-    pub fn set_resolver_kind(&mut self, resolver_kind: ResolverKind) {
-        self.resolver_kind = resolver_kind;
+    pub fn max_fallback_steps(&self) -> usize {
+        self.max_fallback_steps
     }
 
     pub fn register(
@@ -49,46 +72,59 @@ impl Dispatcher {
         key: KernelKey,
         metadata: KernelMetadata,
     ) -> Result<(), DispatchError> {
-        self.registry
-            .register(key, metadata)
-            .map_err(DispatchError::Registry)
+        self.ensure_key_version(key)?;
+        self.registry.register(key, metadata);
+        Ok(())
     }
 
-    pub fn dispatch(&mut self, key: KernelKey, args: &KernelArgs) -> Result<(), DispatchError> {
-        if key.execution() != args.tag() {
-            return Err(DispatchError::ArgsExecutionMismatch {
-                key: key.execution(),
-                args: args.tag(),
+    pub fn stats(&self) -> KernelRegistryStats {
+        self.registry.stats()
+    }
+
+    fn ensure_key_version(&self, key: KernelKey) -> Result<(), DispatchError> {
+        let key_version = key_version(key).map_err(DispatchError::KeyVersion)?;
+        if key_version != self.version {
+            return Err(DispatchError::KeyVersionMismatch {
+                dispatcher: self.version,
+                key: key_version,
             });
         }
-
-        let launcher = self
-            .registry
-            .select(&key)
-            .ok_or(DispatchError::KernelNotFound { key })?;
-
-        launcher.launch(args).map_err(DispatchError::Launch)
+        Ok(())
     }
+}
 
-    pub fn dispatch_op(
-        &mut self,
-        execution: ExecutionTag,
-        op: OpTag,
-        args: &KernelArgs,
-    ) -> Result<(), DispatchError> {
-        let key = self.resolve_key(execution, op, args);
-        self.dispatch(key, args)
-    }
+impl DispatchApi for Dispatcher {
+    fn dispatch(&mut self, request: DispatchRequest<'_>) -> Result<(), DispatchError> {
+        self.ensure_key_version(request.key)?;
+        let seed_key = request.key;
+        let mut key = seed_key;
+        let mut steps = 0usize;
 
-    pub fn resolve_key(&self, execution: ExecutionTag, op: OpTag, args: &KernelArgs) -> KernelKey {
-        self.resolver_kind.resolve(execution, op, args)
-    }
+        loop {
+            if let Some(launcher) = self.registry.select(&key) {
+                return launcher.launch(request.args).map_err(DispatchError::Launch);
+            }
 
-    pub fn registry(&self) -> &KernelRegistry {
-        &self.registry
-    }
+            if steps >= self.max_fallback_steps {
+                return Err(DispatchError::FallbackOverflow {
+                    seed: seed_key,
+                    max_steps: self.max_fallback_steps,
+                });
+            }
 
-    pub fn registry_mut(&mut self) -> &mut KernelRegistry {
-        &mut self.registry
+            let next = next_fallback_key(self.version, key, request.args)
+                .map_err(DispatchError::Version)?;
+
+            match next {
+                Some(next_key) => {
+                    if next_key == key {
+                        return Err(DispatchError::FallbackLoop { key });
+                    }
+                    key = next_key;
+                    steps += 1;
+                }
+                None => return Err(DispatchError::KernelNotFound { key: seed_key }),
+            }
+        }
     }
 }

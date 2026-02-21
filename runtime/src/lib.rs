@@ -2,15 +2,21 @@ mod dispatcher;
 mod key;
 mod op;
 mod registry;
-mod resolver;
+mod version;
 
+pub use dispatcher::{DispatchApi, DispatchRequest};
 pub use dispatcher::{DispatchError, Dispatcher};
-pub use key::{KernelKey, KernelKeyV1, KernelKeyV2, KeyVersion};
-pub use op::OpTag;
-pub use registry::{
-    KernelRegistry, KernelRegistryConfig, KernelRegistryError, KernelRegistryStats,
+pub use key::{
+    KEY_PAYLOAD_MASK, KEY_VERSION_BITS, KEY_VERSION_MASK, KEY_VERSION_SHIFT, KernelKey, KeyError,
+    KeyVersion, compose_key, key_payload, key_version, key_version_bits,
 };
-pub use resolver::{KeyResolver, ResolverKind, V1KeyResolver, V2KeyResolver};
+pub use op::OpTag;
+pub use registry::{KernelRegistry, KernelRegistryConfig, KernelRegistryStats};
+pub use version::{
+    KeyCodec, KeyFallback, KeyResolver, ResolverKind, V1Fallback, V1KeyCodec, V1KeyError,
+    V1KeyParts, V1KeyResolver, V2Fallback, V2KeyCodec, V2KeyError, V2KeyParts, V2KeyResolver,
+    VersionError, next_fallback_key,
+};
 
 #[cfg(test)]
 mod tests {
@@ -20,18 +26,28 @@ mod tests {
         CpuKernelArgs, CpuKernelLaunchError, ExecutionTag, KernelArgs, KernelMetadata,
     };
 
-    use super::{Dispatcher, KernelKey, KernelRegistryConfig, KeyVersion, OpTag, ResolverKind};
+    use super::{
+        DispatchApi, DispatchError, DispatchRequest, Dispatcher, KernelRegistryConfig, KeyVersion,
+        OpTag, ResolverKind, V1KeyCodec, V1KeyParts, V2KeyCodec, V2KeyParts, key_payload,
+        key_version,
+    };
 
     static KERNEL_CALL_COUNT_V1: AtomicUsize = AtomicUsize::new(0);
-    static KERNEL_CALL_COUNT_V2: AtomicUsize = AtomicUsize::new(0);
+    static KERNEL_CALL_COUNT_V2_ACCEPT: AtomicUsize = AtomicUsize::new(0);
+    static KERNEL_CALL_COUNT_V2_MISMATCH: AtomicUsize = AtomicUsize::new(0);
 
     fn test_fill_kernel_v1(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         KERNEL_CALL_COUNT_V1.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn test_fill_kernel_v2(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
-        KERNEL_CALL_COUNT_V2.fetch_add(1, Ordering::SeqCst);
+    fn test_fill_kernel_v2_accept(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+        KERNEL_CALL_COUNT_V2_ACCEPT.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn test_fill_kernel_v2_mismatch(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+        KERNEL_CALL_COUNT_V2_MISMATCH.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -39,13 +55,24 @@ mod tests {
     fn dispatcher_connects_to_registry_and_launches() {
         KERNEL_CALL_COUNT_V1.store(0, Ordering::SeqCst);
 
-        let mut dispatcher = Dispatcher::new(KernelRegistryConfig {
-            cache_capacity: 1,
-            main_memory_capacity: 1,
-        });
+        let mut dispatcher = Dispatcher::new(
+            KernelRegistryConfig {
+                cache_capacity: 1,
+                main_memory_capacity: 1,
+            },
+            KeyVersion::V1,
+        );
 
-        let fill_key = KernelKey::cpu(OpTag::Fill);
-        let copy_key = KernelKey::cpu(OpTag::Copy);
+        let fill_key = V1KeyCodec::encode(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Fill,
+            selector: 0,
+        });
+        let copy_key = V1KeyCodec::encode(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Copy,
+            selector: 0,
+        });
 
         dispatcher
             .register(
@@ -63,68 +90,161 @@ mod tests {
         let args = KernelArgs::cpu(CpuKernelArgs::new());
 
         dispatcher
-            .dispatch(fill_key, &args)
+            .dispatch(DispatchRequest {
+                key: fill_key,
+                args: &args,
+            })
             .expect("fill dispatch should succeed");
         assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 1);
-        assert_eq!(dispatcher.registry().stats().secondary_hits, 1);
+        assert_eq!(dispatcher.stats().secondary_hits, 1);
 
         dispatcher
-            .dispatch(fill_key, &args)
+            .dispatch(DispatchRequest {
+                key: fill_key,
+                args: &args,
+            })
             .expect("fill dispatch should hit cache");
         assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 2);
-        assert_eq!(dispatcher.registry().stats().cache_hits, 1);
+        assert_eq!(dispatcher.stats().cache_hits, 1);
 
         dispatcher
-            .dispatch(copy_key, &args)
+            .dispatch(DispatchRequest {
+                key: copy_key,
+                args: &args,
+            })
             .expect("copy dispatch should succeed");
         assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 3);
-        assert_eq!(dispatcher.registry().stats().secondary_hits, 2);
+        assert_eq!(dispatcher.stats().secondary_hits, 2);
 
         dispatcher
-            .dispatch(fill_key, &args)
+            .dispatch(DispatchRequest {
+                key: fill_key,
+                args: &args,
+            })
             .expect("fill dispatch should rebuild from secondary");
         assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 4);
-        assert_eq!(dispatcher.registry().stats().secondary_hits, 3);
+        assert_eq!(dispatcher.stats().secondary_hits, 3);
     }
 
     #[test]
-    fn dispatcher_can_switch_to_v2_key_resolution() {
-        KERNEL_CALL_COUNT_V2.store(0, Ordering::SeqCst);
+    fn dispatcher_rejects_key_version_mismatch() {
+        KERNEL_CALL_COUNT_V2_MISMATCH.store(0, Ordering::SeqCst);
 
-        let mut dispatcher =
-            Dispatcher::new(KernelRegistryConfig::default()).with_resolver_kind(ResolverKind::V2);
+        let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1);
         let args = KernelArgs::cpu(CpuKernelArgs::new());
-
-        let key = dispatcher.resolve_key(ExecutionTag::Cpu, OpTag::Fill, &args);
-        assert_eq!(key.version(), KeyVersion::V2);
+        let key = V2KeyCodec::encode(V2KeyParts {
+            op: OpTag::Fill,
+            layout: 0,
+            execution: ExecutionTag::Cpu,
+            fingerprint: 1,
+        });
 
         dispatcher
-            .register(key, KernelMetadata::cpu("fill_v2", test_fill_kernel_v2))
+            .register(
+                key,
+                KernelMetadata::cpu("fill_v2", test_fill_kernel_v2_mismatch),
+            )
+            .expect_err("v2 key on v1 dispatcher should fail");
+
+        let result = dispatcher.dispatch(DispatchRequest { key, args: &args });
+        assert_eq!(
+            result,
+            Err(DispatchError::KeyVersionMismatch {
+                dispatcher: KeyVersion::V1,
+                key: KeyVersion::V2,
+            })
+        );
+    }
+
+    #[test]
+    fn dispatcher_accepts_v2_when_configured() {
+        KERNEL_CALL_COUNT_V2_ACCEPT.store(0, Ordering::SeqCst);
+
+        let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V2);
+        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let key = ResolverKind::V2.resolve(ExecutionTag::Cpu, OpTag::Fill, &args);
+
+        dispatcher
+            .register(
+                key,
+                KernelMetadata::cpu("fill_v2", test_fill_kernel_v2_accept),
+            )
             .expect("v2 registration should succeed");
 
         dispatcher
-            .dispatch_op(ExecutionTag::Cpu, OpTag::Fill, &args)
-            .expect("v2 dispatch_op should succeed");
-        assert_eq!(KERNEL_CALL_COUNT_V2.load(Ordering::SeqCst), 1);
+            .dispatch(DispatchRequest { key, args: &args })
+            .expect("v2 dispatch should succeed");
+        assert_eq!(KERNEL_CALL_COUNT_V2_ACCEPT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
     fn kernel_key_v1_and_v2_roundtrip() {
-        let v1 = KernelKey::v1(ExecutionTag::Cpu, OpTag::Fill);
-        assert_eq!(v1.version(), KeyVersion::V1);
-        assert!(v1.as_v1().is_some());
-        assert!(v1.as_v2().is_none());
-        assert_eq!(v1.execution(), ExecutionTag::Cpu);
-        assert_eq!(v1.op(), OpTag::Fill);
+        let v1_key = V1KeyCodec::encode(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Fill,
+            selector: 7,
+        });
+        let v2_key = V2KeyCodec::encode(V2KeyParts {
+            op: OpTag::Copy,
+            layout: 3,
+            execution: ExecutionTag::Cpu,
+            fingerprint: 0xDEAD_BEEF,
+        });
 
-        let v2 = KernelKey::v2(ExecutionTag::Cpu, OpTag::Copy, 0xDEAD_BEEF);
-        assert_eq!(v2.version(), KeyVersion::V2);
-        assert!(v2.as_v1().is_none());
-        let decoded = v2
-            .as_v2()
-            .expect("v2 key should decode as v2 representation");
-        assert_eq!(decoded.signature_hash(), 0xDEAD_BEEF);
-        assert_eq!(decoded.execution(), ExecutionTag::Cpu);
-        assert_eq!(decoded.op(), OpTag::Copy);
+        assert_eq!(
+            key_version(v1_key).expect("v1 key should decode version"),
+            KeyVersion::V1
+        );
+        assert_eq!(
+            key_version(v2_key).expect("v2 key should decode version"),
+            KeyVersion::V2
+        );
+
+        let decoded_v1 = V1KeyCodec::decode(v1_key).expect("v1 decode should succeed");
+        let decoded_v2 = V2KeyCodec::decode(v2_key).expect("v2 decode should succeed");
+
+        assert_eq!(decoded_v1.execution, ExecutionTag::Cpu);
+        assert_eq!(decoded_v1.op, OpTag::Fill);
+        assert_eq!(decoded_v1.selector, 7);
+        assert_eq!(decoded_v2.execution, ExecutionTag::Cpu);
+        assert_eq!(decoded_v2.op, OpTag::Copy);
+        assert_eq!(decoded_v2.layout, 3);
+        assert_eq!(decoded_v2.fingerprint, 0xDEAD_BEEF);
+        assert_ne!(key_payload(v1_key), key_payload(v2_key));
+    }
+
+    #[test]
+    fn dispatcher_uses_incremental_v1_fallback() {
+        KERNEL_CALL_COUNT_V1.store(0, Ordering::SeqCst);
+
+        let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1)
+            .with_max_fallback_steps(8);
+        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let generic_key = V1KeyCodec::encode(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Fill,
+            selector: 0,
+        });
+        let optimized_seed = V1KeyCodec::encode(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Fill,
+            selector: 2,
+        });
+
+        dispatcher
+            .register(
+                generic_key,
+                KernelMetadata::cpu("fill_generic", test_fill_kernel_v1),
+            )
+            .expect("generic v1 registration should succeed");
+
+        dispatcher
+            .dispatch(DispatchRequest {
+                key: optimized_seed,
+                args: &args,
+            })
+            .expect("dispatcher should fallback from selector=2 down to selector=0");
+
+        assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 1);
     }
 }

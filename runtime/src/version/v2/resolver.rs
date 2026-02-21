@@ -1,29 +1,12 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use execution::KernelArgs;
-use execution::{ExecutionTag, KernelArgs as ExecutionKernelArgs};
+use execution::{ExecutionTag, KernelArgs};
 use schema::ArgRole;
 
+use crate::version::api::KeyResolver;
+use crate::version::v2::codec::{V2KeyCodec, V2KeyParts};
 use crate::{KernelKey, KeyVersion, OpTag};
-
-pub trait KeyResolver {
-    fn version(&self) -> KeyVersion;
-    fn resolve(&self, execution: ExecutionTag, op: OpTag, args: &KernelArgs) -> KernelKey;
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct V1KeyResolver;
-
-impl KeyResolver for V1KeyResolver {
-    fn version(&self) -> KeyVersion {
-        KeyVersion::V1
-    }
-
-    fn resolve(&self, execution: ExecutionTag, op: OpTag, _args: &KernelArgs) -> KernelKey {
-        KernelKey::v1(execution, op)
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct V2KeyResolver;
@@ -34,43 +17,21 @@ impl KeyResolver for V2KeyResolver {
     }
 
     fn resolve(&self, execution: ExecutionTag, op: OpTag, args: &KernelArgs) -> KernelKey {
-        let signature_hash = hash_kernel_args(args);
-        KernelKey::v2(execution, op, signature_hash)
+        let fingerprint = hash_kernel_args(args);
+        V2KeyCodec::encode(V2KeyParts {
+            op,
+            layout: 0,
+            execution,
+            fingerprint,
+        })
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ResolverKind {
-    /// Production default: stable and minimal.
-    #[default]
-    V1,
-    /// Opt-in path for future richer keying.
-    ///
-    /// Keep this explicit at call sites so migration is controlled per-op/per-flow.
-    V2,
-}
-
-impl ResolverKind {
-    pub fn version(self) -> KeyVersion {
-        match self {
-            Self::V1 => KeyVersion::V1,
-            Self::V2 => KeyVersion::V2,
-        }
-    }
-
-    pub fn resolve(self, execution: ExecutionTag, op: OpTag, args: &KernelArgs) -> KernelKey {
-        match self {
-            Self::V1 => V1KeyResolver.resolve(execution, op, args),
-            Self::V2 => V2KeyResolver.resolve(execution, op, args),
-        }
-    }
-}
-
-fn hash_kernel_args(args: &ExecutionKernelArgs) -> u64 {
+fn hash_kernel_args(args: &KernelArgs) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     match args {
-        ExecutionKernelArgs::Cpu(cpu_args) => {
+        KernelArgs::Cpu(cpu_args) => {
             cpu_args.context().worker_threads().hash(&mut hasher);
 
             let mut normalized: Vec<(u8, String, u8)> = cpu_args

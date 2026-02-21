@@ -101,6 +101,10 @@ impl Dispatcher {
         Ok(())
     }
 
+    pub fn initialize_builtins(&mut self) -> Result<(), DispatchError> {
+        crate::kernels::register_builtins(self)
+    }
+
     pub fn stats(&self) -> KernelRegistryStats {
         self.registry.stats()
     }

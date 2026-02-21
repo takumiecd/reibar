@@ -7,6 +7,8 @@ name = "dense_impl"
 version = "0.1.0"
 dependencies = [
  "execution",
+ "runtime",
+ "schema",
 ]
 
 [[package]]
@@ -29,6 +31,7 @@ name = "runtime"
 version = "0.1.0"
 dependencies = [
  "execution",
+ "execution_cpu",
  "schema",
 ]
 

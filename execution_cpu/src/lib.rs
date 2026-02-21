@@ -1,7 +1,7 @@
 mod bundle;
 mod capability;
 mod execution;
-mod kernel;
+pub mod kernel;
 mod storage;
 
 pub use bundle::CpuBundle;

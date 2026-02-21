@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 execution = { path = "../../execution" }
+runtime = { path = "../../runtime" }
+schema = { path = "../../schema" }

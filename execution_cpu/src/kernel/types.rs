@@ -1,4 +1,4 @@
-use schema::{ArgKey, KernelArg, KernelArgs, KernelArgsError, StorageValue};
+use schema::{KernelArg, KernelArgs, KernelArgsError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CpuKernelContext {
@@ -62,13 +62,6 @@ impl CpuKernelArgs {
         self.args.len()
     }
 
-    pub fn require_storage(&self, key: &ArgKey) -> Result<&(), KernelArgsError> {
-        self.args.require_as::<StorageValue>(key)
-    }
-
-    pub fn require_f32(&self, key: &ArgKey) -> Result<&f32, KernelArgsError> {
-        self.args.require_as::<f32>(key)
-    }
 }
 
 impl Default for CpuKernelArgs {

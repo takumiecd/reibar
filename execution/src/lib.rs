@@ -17,7 +17,7 @@ pub use tag::{Execution, ExecutionTag};
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use schema::{ArgKey, ArgRole, KernelArg};
+    use schema::{ArgKey, ArgKind, ArgRole, KernelArg, StorageValue};
 
     use super::{
         Capability, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError, CpuKernelMetadata,
@@ -67,9 +67,9 @@ mod tests {
         assert_eq!(launcher.tag(), ExecutionTag::Cpu);
         let cpu_context = CpuKernelContext::new().with_worker_threads(4);
         let mut args = CpuKernelArgs::new().with_context(cpu_context.clone());
-        let input_key = ArgKey::new(ArgRole::Input, "dst");
-        let alpha_key = ArgKey::new(ArgRole::Param, "alpha");
-        let beta_key = ArgKey::new(ArgRole::Param, "beta");
+        let input_key = ArgKey::new(ArgRole::Input, "dst", ArgKind::Storage);
+        let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
+        let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::F32);
 
         args.insert(KernelArg::storage(input_key.clone(), ()))
             .expect("storage insertion should succeed");
@@ -85,11 +85,12 @@ mod tests {
                 assert_eq!(args.context(), &cpu_context);
                 assert_eq!(
                     *args
-                        .require_f32(&alpha_key)
+                        .args()
+                        .require_as::<f32>(&alpha_key)
                         .expect("alpha must exist as f32"),
                     1.0
                 );
-                assert!(args.require_storage(&input_key).is_ok());
+                assert!(args.args().require_as::<StorageValue>(&input_key).is_ok());
                 cpu.launch(&args)
                     .expect("cpu kernel launcher should accept cpu kernel args");
                 assert_eq!(KERNEL_CALL_COUNT.load(Ordering::SeqCst), 1);

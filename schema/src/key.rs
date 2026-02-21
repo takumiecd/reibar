@@ -1,4 +1,4 @@
-use crate::ArgRole;
+use crate::{ArgKind, ArgRole};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArgTag(String);
@@ -29,13 +29,15 @@ impl From<String> for ArgTag {
 pub struct ArgKey {
     role: ArgRole,
     tag: ArgTag,
+    dtype: ArgKind,
 }
 
 impl ArgKey {
-    pub fn new(role: ArgRole, tag: impl Into<ArgTag>) -> Self {
+    pub fn new(role: ArgRole, tag: impl Into<ArgTag>, dtype: ArgKind) -> Self {
         Self {
             role,
             tag: tag.into(),
+            dtype,
         }
     }
 
@@ -45,5 +47,9 @@ impl ArgKey {
 
     pub fn tag(&self) -> &ArgTag {
         &self.tag
+    }
+
+    pub fn dtype(&self) -> ArgKind {
+        self.dtype
     }
 }

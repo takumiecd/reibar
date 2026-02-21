@@ -1,4 +1,11 @@
-use execution::{CpuStorage, ExecutionTag, Storage};
+use std::sync::{Mutex, OnceLock};
+
+use execution::{CpuKernelArgs, CpuStorage, ExecutionTag, KernelArgs, Storage};
+use runtime::{
+    DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
+    V1KeyParts,
+};
+use schema::{ArgKey, ArgKind, ArgRole, KernelArg};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DenseTensorImpl {
@@ -19,11 +26,68 @@ impl DenseTensorImpl {
         self.storage.tag()
     }
 
+    pub fn fill(&mut self, value: f32) -> Result<(), DenseOpError> {
+        let mut cpu_args = CpuKernelArgs::new();
+        cpu_args
+            .insert(KernelArg::storage(fill_output_key(), ()))
+            .map_err(DenseOpError::KernelArgs)?;
+        cpu_args
+            .insert(KernelArg::f32(fill_value_key(), value))
+            .map_err(DenseOpError::KernelArgs)?;
+        let args = KernelArgs::cpu(cpu_args);
+
+        let seed = SeedSpec::V1(V1KeyParts {
+            execution: self.execution_tag(),
+            op: OpTag::Fill,
+            selector: 0,
+        });
+
+        let dispatcher = dense_dispatcher();
+        let mut dispatcher = dispatcher
+            .lock()
+            .map_err(|_| DenseOpError::DispatcherPoisoned)?;
+        dispatcher
+            .dispatch_seed(seed, &args)
+            .map_err(DenseOpError::Dispatch)?;
+
+        match &mut self.storage {
+            Storage::Cpu(storage) => storage.fill(value),
+        }
+
+        Ok(())
+    }
+
     pub fn data(&self) -> &[f32] {
         match &self.storage {
             Storage::Cpu(storage) => storage.as_slice(),
         }
     }
+}
+
+#[derive(Debug)]
+pub enum DenseOpError {
+    DispatcherPoisoned,
+    KernelArgs(schema::KernelArgsError),
+    Dispatch(DispatchError),
+}
+
+fn fill_output_key() -> ArgKey {
+    ArgKey::new(ArgRole::Output, "out", ArgKind::Storage)
+}
+
+fn fill_value_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "value", ArgKind::F32)
+}
+
+fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
+    static DISPATCHER: OnceLock<Mutex<Dispatcher>> = OnceLock::new();
+    DISPATCHER.get_or_init(|| {
+        let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1);
+        dispatcher
+            .initialize_builtins()
+            .expect("dense builtins initialization must succeed");
+        Mutex::new(dispatcher)
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -139,5 +203,16 @@ mod tests {
 
         assert_eq!(tensor.storage().tag(), ExecutionTag::Cpu);
         assert_eq!(tensor.data(), &[0.0, 0.0]);
+    }
+
+    #[test]
+    fn fill_op_dispatches_and_updates_storage() {
+        let mut tensor = DenseBuilder::new(vec![2, 2])
+            .with_data(vec![1.0, 2.0, 3.0, 4.0])
+            .build()
+            .expect("dense build should succeed");
+
+        tensor.fill(9.5).expect("fill op should succeed");
+        assert_eq!(tensor.data(), &[9.5, 9.5, 9.5, 9.5]);
     }
 }

@@ -14,6 +14,10 @@ impl CpuStorage {
         }
     }
 
+    pub fn fill(&mut self, value: f32) {
+        self.data.fill(value);
+    }
+
     pub fn len(&self) -> usize {
         self.data.len()
     }

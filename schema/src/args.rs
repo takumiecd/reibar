@@ -1,4 +1,4 @@
-use crate::{ArgKey, ArgValueAccess, KernelArg, KernelArgsError, StorageValue};
+use crate::{ArgKey, ArgValueAccess, KernelArg, KernelArgsError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KernelArgs<S> {
@@ -19,6 +19,14 @@ impl<S> KernelArgs<S> {
     }
 
     pub fn insert(&mut self, arg: KernelArg<S>) -> Result<(), KernelArgsError> {
+        if arg.key().dtype() != arg.value().kind() {
+            return Err(KernelArgsError::TypeMismatch {
+                key: arg.key().clone(),
+                expected: arg.key().dtype(),
+                actual: arg.value().kind(),
+            });
+        }
+
         if self.args.iter().any(|existing| existing.key() == arg.key()) {
             return Err(KernelArgsError::DuplicateKey {
                 key: arg.key().clone(),
@@ -31,18 +39,6 @@ impl<S> KernelArgs<S> {
 
     pub fn iter(&self) -> impl Iterator<Item = &KernelArg<S>> {
         self.args.iter()
-    }
-
-    pub fn require_storage(&self, key: &ArgKey) -> Result<&S, KernelArgsError> {
-        self.require_as::<StorageValue>(key)
-    }
-
-    pub fn require_f32(&self, key: &ArgKey) -> Result<&f32, KernelArgsError> {
-        self.require_as::<f32>(key)
-    }
-
-    pub fn require_i64(&self, key: &ArgKey) -> Result<&i64, KernelArgsError> {
-        self.require_as::<i64>(key)
     }
 
     pub fn require_as<T>(&self, key: &ArgKey) -> Result<T::Ref<'_>, KernelArgsError>

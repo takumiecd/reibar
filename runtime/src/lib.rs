@@ -1,4 +1,5 @@
 mod dispatcher;
+mod kernels;
 mod key;
 mod op;
 mod registry;

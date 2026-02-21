@@ -23,7 +23,8 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use execution::{
-        CpuKernelArgs, CpuKernelLaunchError, ExecutionTag, KernelArgs, KernelMetadata,
+        CpuKernelArgs, CpuKernelLaunchError, CpuKernelMetadata, ExecutionTag, KernelArgs,
+        KernelMetadata,
     };
 
     use super::{
@@ -89,13 +90,19 @@ mod tests {
         dispatcher
             .register(
                 fill_key,
-                KernelMetadata::cpu("fill_f32", test_fill_kernel_v1_connect),
+                KernelMetadata::Cpu(CpuKernelMetadata::new(
+                    "fill_f32",
+                    test_fill_kernel_v1_connect,
+                )),
             )
             .expect("fill registration should succeed");
         dispatcher
             .register(
                 copy_key,
-                KernelMetadata::cpu("copy_f32", test_fill_kernel_v1_connect),
+                KernelMetadata::Cpu(CpuKernelMetadata::new(
+                    "copy_f32",
+                    test_fill_kernel_v1_connect,
+                )),
             )
             .expect("copy registration should succeed");
 
@@ -154,7 +161,10 @@ mod tests {
         dispatcher
             .register(
                 key,
-                KernelMetadata::cpu("fill_v2", test_fill_kernel_v2_mismatch),
+                KernelMetadata::Cpu(CpuKernelMetadata::new(
+                    "fill_v2",
+                    test_fill_kernel_v2_mismatch,
+                )),
             )
             .expect_err("v2 key on v1 dispatcher should fail");
 
@@ -179,7 +189,10 @@ mod tests {
         dispatcher
             .register(
                 key,
-                KernelMetadata::cpu("fill_v2", test_fill_kernel_v2_accept),
+                KernelMetadata::Cpu(CpuKernelMetadata::new(
+                    "fill_v2",
+                    test_fill_kernel_v2_accept,
+                )),
             )
             .expect("v2 registration should succeed");
 
@@ -246,7 +259,10 @@ mod tests {
         dispatcher
             .register(
                 generic_key,
-                KernelMetadata::cpu("fill_generic", test_fill_kernel_v1_fallback),
+                KernelMetadata::Cpu(CpuKernelMetadata::new(
+                    "fill_generic",
+                    test_fill_kernel_v1_fallback,
+                )),
             )
             .expect("generic v1 registration should succeed");
 
@@ -280,7 +296,10 @@ mod tests {
         dispatcher
             .register(
                 generic_seed.encode(),
-                KernelMetadata::cpu("fill_generic", test_fill_kernel_v1_seed),
+                KernelMetadata::Cpu(CpuKernelMetadata::new(
+                    "fill_generic",
+                    test_fill_kernel_v1_seed,
+                )),
             )
             .expect("generic registration should succeed");
 

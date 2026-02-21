@@ -20,8 +20,9 @@ mod tests {
     use schema::{ArgKey, ArgRole, KernelArg};
 
     use super::{
-        Capability, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError, CpuStorage, Execution,
-        ExecutionTag, KernelContext, KernelLauncher, KernelMetadata, Storage,
+        Capability, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError, CpuKernelMetadata,
+        CpuStorage, Execution, ExecutionTag, KernelContext, KernelLauncher, KernelMetadata,
+        Storage,
     };
 
     static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -59,7 +60,7 @@ mod tests {
     fn kernel_metadata_builds_kernel_launcher() {
         KERNEL_CALL_COUNT.store(0, Ordering::SeqCst);
 
-        let metadata = KernelMetadata::cpu("fill_f32", test_fill_kernel);
+        let metadata = KernelMetadata::Cpu(CpuKernelMetadata::new("fill_f32", test_fill_kernel));
         assert_eq!(metadata.tag(), ExecutionTag::Cpu);
 
         let launcher = metadata.into_launcher();

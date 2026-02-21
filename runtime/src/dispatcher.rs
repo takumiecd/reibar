@@ -1,5 +1,6 @@
 use execution::{KernelArgs, KernelLaunchError, KernelMetadata};
 
+use crate::version::{V1KeyCodec, V1KeyParts, V2KeyCodec, V2KeyParts};
 use crate::version::{VersionError, next_fallback_key};
 use crate::{KernelKey, KernelRegistry, KernelRegistryStats, KeyError, KeyVersion, key_version};
 
@@ -30,8 +31,31 @@ pub struct DispatchRequest<'a> {
     pub args: &'a KernelArgs,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeedSpec {
+    V1(V1KeyParts),
+    V2(V2KeyParts),
+}
+
+impl SeedSpec {
+    pub fn version(&self) -> KeyVersion {
+        match self {
+            Self::V1(_) => KeyVersion::V1,
+            Self::V2(_) => KeyVersion::V2,
+        }
+    }
+
+    pub fn encode(&self) -> KernelKey {
+        match self {
+            Self::V1(parts) => V1KeyCodec::encode(*parts),
+            Self::V2(parts) => V2KeyCodec::encode(*parts),
+        }
+    }
+}
+
 pub trait DispatchApi {
     fn dispatch(&mut self, request: DispatchRequest<'_>) -> Result<(), DispatchError>;
+    fn dispatch_seed(&mut self, seed: SeedSpec, args: &KernelArgs) -> Result<(), DispatchError>;
 }
 
 #[derive(Debug, Clone)]
@@ -126,5 +150,10 @@ impl DispatchApi for Dispatcher {
                 None => return Err(DispatchError::KernelNotFound { key: seed_key }),
             }
         }
+    }
+
+    fn dispatch_seed(&mut self, seed: SeedSpec, args: &KernelArgs) -> Result<(), DispatchError> {
+        let key = seed.encode();
+        self.dispatch(DispatchRequest { key, args })
     }
 }

@@ -6,6 +6,7 @@
 
 - Stable request surface for ops:
   - `DispatchRequest { key, args }`
+  - `dispatch_seed(seed_spec, args)` for typed seed input (`V1KeyParts` / `V2KeyParts`)
 - Key creation and key lookup are separated:
   - key creation: ops/resolver/codec side
   - key lookup: dispatcher/registry side

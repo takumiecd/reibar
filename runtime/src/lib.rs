@@ -4,7 +4,7 @@ mod op;
 mod registry;
 mod version;
 
-pub use dispatcher::{DispatchApi, DispatchRequest};
+pub use dispatcher::{DispatchApi, DispatchRequest, SeedSpec};
 pub use dispatcher::{DispatchError, Dispatcher};
 pub use key::{
     KEY_PAYLOAD_MASK, KEY_VERSION_BITS, KEY_VERSION_MASK, KEY_VERSION_SHIFT, KernelKey, KeyError,
@@ -28,16 +28,28 @@ mod tests {
 
     use super::{
         DispatchApi, DispatchError, DispatchRequest, Dispatcher, KernelRegistryConfig, KeyVersion,
-        OpTag, ResolverKind, V1KeyCodec, V1KeyParts, V2KeyCodec, V2KeyParts, key_payload,
+        OpTag, ResolverKind, SeedSpec, V1KeyCodec, V1KeyParts, V2KeyCodec, V2KeyParts, key_payload,
         key_version,
     };
 
-    static KERNEL_CALL_COUNT_V1: AtomicUsize = AtomicUsize::new(0);
+    static KERNEL_CALL_COUNT_V1_CONNECT: AtomicUsize = AtomicUsize::new(0);
+    static KERNEL_CALL_COUNT_V1_FALLBACK: AtomicUsize = AtomicUsize::new(0);
+    static KERNEL_CALL_COUNT_V1_SEED: AtomicUsize = AtomicUsize::new(0);
     static KERNEL_CALL_COUNT_V2_ACCEPT: AtomicUsize = AtomicUsize::new(0);
     static KERNEL_CALL_COUNT_V2_MISMATCH: AtomicUsize = AtomicUsize::new(0);
 
-    fn test_fill_kernel_v1(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
-        KERNEL_CALL_COUNT_V1.fetch_add(1, Ordering::SeqCst);
+    fn test_fill_kernel_v1_connect(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+        KERNEL_CALL_COUNT_V1_CONNECT.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn test_fill_kernel_v1_fallback(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+        KERNEL_CALL_COUNT_V1_FALLBACK.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn test_fill_kernel_v1_seed(_args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+        KERNEL_CALL_COUNT_V1_SEED.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -53,7 +65,7 @@ mod tests {
 
     #[test]
     fn dispatcher_connects_to_registry_and_launches() {
-        KERNEL_CALL_COUNT_V1.store(0, Ordering::SeqCst);
+        KERNEL_CALL_COUNT_V1_CONNECT.store(0, Ordering::SeqCst);
 
         let mut dispatcher = Dispatcher::new(
             KernelRegistryConfig {
@@ -77,13 +89,13 @@ mod tests {
         dispatcher
             .register(
                 fill_key,
-                KernelMetadata::cpu("fill_f32", test_fill_kernel_v1),
+                KernelMetadata::cpu("fill_f32", test_fill_kernel_v1_connect),
             )
             .expect("fill registration should succeed");
         dispatcher
             .register(
                 copy_key,
-                KernelMetadata::cpu("copy_f32", test_fill_kernel_v1),
+                KernelMetadata::cpu("copy_f32", test_fill_kernel_v1_connect),
             )
             .expect("copy registration should succeed");
 
@@ -95,7 +107,7 @@ mod tests {
                 args: &args,
             })
             .expect("fill dispatch should succeed");
-        assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 1);
+        assert_eq!(KERNEL_CALL_COUNT_V1_CONNECT.load(Ordering::SeqCst), 1);
         assert_eq!(dispatcher.stats().secondary_hits, 1);
 
         dispatcher
@@ -104,7 +116,7 @@ mod tests {
                 args: &args,
             })
             .expect("fill dispatch should hit cache");
-        assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 2);
+        assert_eq!(KERNEL_CALL_COUNT_V1_CONNECT.load(Ordering::SeqCst), 2);
         assert_eq!(dispatcher.stats().cache_hits, 1);
 
         dispatcher
@@ -113,7 +125,7 @@ mod tests {
                 args: &args,
             })
             .expect("copy dispatch should succeed");
-        assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 3);
+        assert_eq!(KERNEL_CALL_COUNT_V1_CONNECT.load(Ordering::SeqCst), 3);
         assert_eq!(dispatcher.stats().secondary_hits, 2);
 
         dispatcher
@@ -122,7 +134,7 @@ mod tests {
                 args: &args,
             })
             .expect("fill dispatch should rebuild from secondary");
-        assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 4);
+        assert_eq!(KERNEL_CALL_COUNT_V1_CONNECT.load(Ordering::SeqCst), 4);
         assert_eq!(dispatcher.stats().secondary_hits, 3);
     }
 
@@ -215,7 +227,7 @@ mod tests {
 
     #[test]
     fn dispatcher_uses_incremental_v1_fallback() {
-        KERNEL_CALL_COUNT_V1.store(0, Ordering::SeqCst);
+        KERNEL_CALL_COUNT_V1_FALLBACK.store(0, Ordering::SeqCst);
 
         let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1)
             .with_max_fallback_steps(8);
@@ -234,7 +246,7 @@ mod tests {
         dispatcher
             .register(
                 generic_key,
-                KernelMetadata::cpu("fill_generic", test_fill_kernel_v1),
+                KernelMetadata::cpu("fill_generic", test_fill_kernel_v1_fallback),
             )
             .expect("generic v1 registration should succeed");
 
@@ -245,6 +257,37 @@ mod tests {
             })
             .expect("dispatcher should fallback from selector=2 down to selector=0");
 
-        assert_eq!(KERNEL_CALL_COUNT_V1.load(Ordering::SeqCst), 1);
+        assert_eq!(KERNEL_CALL_COUNT_V1_FALLBACK.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn dispatch_seed_encodes_and_runs() {
+        KERNEL_CALL_COUNT_V1_SEED.store(0, Ordering::SeqCst);
+
+        let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1);
+        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let generic_seed = SeedSpec::V1(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Fill,
+            selector: 0,
+        });
+        let optimized_seed = SeedSpec::V1(V1KeyParts {
+            execution: ExecutionTag::Cpu,
+            op: OpTag::Fill,
+            selector: 3,
+        });
+
+        dispatcher
+            .register(
+                generic_seed.encode(),
+                KernelMetadata::cpu("fill_generic", test_fill_kernel_v1_seed),
+            )
+            .expect("generic registration should succeed");
+
+        dispatcher
+            .dispatch_seed(optimized_seed, &args)
+            .expect("dispatch_seed should encode and fallback to generic kernel");
+
+        assert_eq!(KERNEL_CALL_COUNT_V1_SEED.load(Ordering::SeqCst), 1);
     }
 }

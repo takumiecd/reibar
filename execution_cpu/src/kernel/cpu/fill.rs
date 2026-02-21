@@ -67,7 +67,12 @@ mod tests {
     #[test]
     fn launch_accepts_expected_args() {
         let mut args = CpuKernelArgs::new();
-        let out = CpuStorage::new(CpuBuffer::new(vec![0u8; 16]), DType::F32);
+        let out = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 16], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
         args.insert(KernelArg::f32(value_key(), 3.0))
@@ -83,7 +88,12 @@ mod tests {
         let mut args = CpuKernelArgs::new();
         args.insert(KernelArg::storage(
             output_key(),
-            CpuStorage::new(CpuBuffer::new(vec![0u8; 8]), DType::F32),
+            CpuStorage::new(
+                CpuBuffer::new_with_alignment(vec![0u8; 8], DType::F32.alignment())
+                    .expect("aligned buffer creation should succeed"),
+                DType::F32,
+            )
+            .expect("typed storage creation should succeed"),
         ))
             .expect("out insertion should succeed");
 

@@ -46,10 +46,17 @@ mod tests {
 
     #[test]
     fn storage_from_tag_is_cpu_storage() {
-        let storage = Storage::Cpu(CpuStorage::new(
-            CpuBuffer::new(encode_f32_slice(&[2.5, 2.5, 2.5])),
-            DType::F32,
-        ));
+        let storage = Storage::Cpu(
+            CpuStorage::new(
+                CpuBuffer::new_with_alignment(
+                    encode_f32_slice(&[2.5, 2.5, 2.5]),
+                    DType::F32.alignment(),
+                )
+                .expect("aligned buffer creation should succeed"),
+                DType::F32,
+            )
+            .expect("typed storage creation should succeed"),
+        );
         assert_eq!(storage.tag(), ExecutionTag::Cpu);
         assert_eq!(storage.len_bytes(), 12);
         assert_eq!(storage.dtype(), DType::F32);
@@ -70,13 +77,18 @@ mod tests {
         let storage = Storage::allocate(
             ExecutionTag::Cpu,
             &context,
-            StorageRequest::new(16, DType::F32),
+            StorageRequest::new(16, DType::F32).with_alignment(64),
         )
         .expect("storage allocation should succeed");
 
         assert_eq!(storage.tag(), ExecutionTag::Cpu);
         assert_eq!(storage.len_bytes(), 16);
         assert_eq!(storage.dtype(), DType::F32);
+        match storage {
+            Storage::Cpu(cpu_storage) => {
+                assert!(cpu_storage.alignment() >= 64);
+            }
+        }
     }
 
     #[test]
@@ -96,7 +108,12 @@ mod tests {
 
         args.insert(KernelArg::storage(
             input_key.clone(),
-            CpuStorage::new(CpuBuffer::new(vec![0u8; 4]), DType::F32),
+            CpuStorage::new(
+                CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                    .expect("aligned buffer creation should succeed"),
+                DType::F32,
+            )
+            .expect("typed storage creation should succeed"),
         ))
             .expect("storage insertion should succeed");
         args.insert(KernelArg::f32(alpha_key.clone(), 1.0))

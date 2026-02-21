@@ -1,28 +1,29 @@
-#[derive(Debug, Clone, PartialEq)]
+use std::sync::{Arc, RwLock};
+
+#[derive(Debug, Clone)]
 pub struct CpuStorage {
-    data: Vec<f32>,
+    data: Arc<RwLock<Vec<f32>>>,
 }
 
 impl CpuStorage {
-    pub fn from_vec(data: Vec<f32>) -> Self {
-        Self { data }
-    }
-
-    pub fn filled(len: usize, value: f32) -> Self {
+    pub fn new(data: Vec<f32>) -> Self {
         Self {
-            data: vec![value; len],
+            data: Arc::new(RwLock::new(data)),
         }
     }
 
-    pub fn fill(&mut self, value: f32) {
-        self.data.fill(value);
-    }
-
     pub fn len(&self) -> usize {
-        self.data.len()
+        let data = self.data.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        data.len()
     }
 
-    pub fn as_slice(&self) -> &[f32] {
-        &self.data
+    pub fn with_read<R>(&self, f: impl FnOnce(&[f32]) -> R) -> R {
+        let data = self.data.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        f(&data)
+    }
+
+    pub fn with_write<R>(&self, f: impl FnOnce(&mut [f32]) -> R) -> R {
+        let mut data = self.data.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+        f(&mut data)
     }
 }

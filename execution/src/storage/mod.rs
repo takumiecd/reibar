@@ -3,7 +3,7 @@ use crate::backend::{BackendBundle, for_each_backend};
 
 macro_rules! define_storage_types {
     ($($variant:ident => $bundle:path),+ $(,)?) => {
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone)]
         pub enum Storage {
             $($variant(<$bundle as BackendBundle>::Storage)),+
         }

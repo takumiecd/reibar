@@ -43,12 +43,13 @@ mod tests {
 
     #[test]
     fn storage_from_tag_is_cpu_storage() {
-        let storage = Storage::Cpu(CpuStorage::filled(3, 2.5));
+        let storage = Storage::Cpu(CpuStorage::new(vec![2.5, 2.5, 2.5]));
         assert_eq!(storage.tag(), ExecutionTag::Cpu);
         assert_eq!(storage.len(), 3);
         match &storage {
             Storage::Cpu(cpu_storage) => {
-                assert_eq!(cpu_storage.as_slice(), &[2.5, 2.5, 2.5]);
+                let values = cpu_storage.with_read(|slice| slice.to_vec());
+                assert_eq!(values, vec![2.5, 2.5, 2.5]);
             }
         }
 
@@ -71,7 +72,7 @@ mod tests {
         let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
         let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::F32);
 
-        args.insert(KernelArg::storage(input_key.clone(), ()))
+        args.insert(KernelArg::storage(input_key.clone(), CpuStorage::new(vec![0.0])))
             .expect("storage insertion should succeed");
         args.insert(KernelArg::f32(alpha_key.clone(), 1.0))
             .expect("alpha insertion should succeed");

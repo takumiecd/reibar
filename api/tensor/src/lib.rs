@@ -5,7 +5,7 @@ pub enum TensorTag {
     Dense,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Tensor {
     Dense(DenseTensorImpl),
 }
@@ -85,7 +85,7 @@ mod tests {
         match tensor {
             Tensor::Dense(inner) => {
                 assert_eq!(inner.shape(), &[1, 3]);
-                assert_eq!(inner.data(), &[0.0, 0.0, 0.0]);
+                assert_eq!(inner.data(), vec![0.0, 0.0, 0.0]);
             }
         }
     }

@@ -7,7 +7,7 @@ use runtime::{
 };
 use schema::{ArgKey, ArgKind, ArgRole, KernelArg};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DenseTensorImpl {
     shape: Vec<usize>,
     storage: Storage,
@@ -28,8 +28,11 @@ impl DenseTensorImpl {
 
     pub fn fill(&mut self, value: f32) -> Result<(), DenseOpError> {
         let mut cpu_args = CpuKernelArgs::new();
+        let out = match &self.storage {
+            Storage::Cpu(storage) => storage.clone(),
+        };
         cpu_args
-            .insert(KernelArg::storage(fill_output_key(), ()))
+            .insert(KernelArg::storage(fill_output_key(), out))
             .map_err(DenseOpError::KernelArgs)?;
         cpu_args
             .insert(KernelArg::f32(fill_value_key(), value))
@@ -50,16 +53,12 @@ impl DenseTensorImpl {
             .dispatch_seed(seed, &args)
             .map_err(DenseOpError::Dispatch)?;
 
-        match &mut self.storage {
-            Storage::Cpu(storage) => storage.fill(value),
-        }
-
         Ok(())
     }
 
-    pub fn data(&self) -> &[f32] {
+    pub fn data(&self) -> Vec<f32> {
         match &self.storage {
-            Storage::Cpu(storage) => storage.as_slice(),
+            Storage::Cpu(storage) => storage.with_read(|slice| slice.to_vec()),
         }
     }
 }
@@ -134,11 +133,11 @@ impl DenseBuilder {
                     });
                 }
                 match self.execution_tag {
-                    ExecutionTag::Cpu => Storage::Cpu(CpuStorage::from_vec(data)),
+                    ExecutionTag::Cpu => Storage::Cpu(CpuStorage::new(data)),
                 }
             }
             None => match self.execution_tag {
-                ExecutionTag::Cpu => Storage::Cpu(CpuStorage::filled(expected, self.fill_value)),
+                ExecutionTag::Cpu => Storage::Cpu(CpuStorage::new(vec![self.fill_value; expected])),
             },
         };
 
@@ -175,7 +174,7 @@ mod tests {
             .expect("dense build should succeed");
 
         assert_eq!(tensor.shape(), &[2, 3]);
-        assert_eq!(tensor.data(), &[1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
+        assert_eq!(tensor.data(), vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
         assert_eq!(tensor.execution_tag(), ExecutionTag::Cpu);
     }
 
@@ -185,13 +184,13 @@ mod tests {
             .with_data(vec![1.0, 2.0])
             .build();
 
-        assert_eq!(
-            result,
-            Err(DenseBuildError::DataLengthMismatch {
-                expected: 4,
-                actual: 2,
-            })
-        );
+        match result {
+            Err(DenseBuildError::DataLengthMismatch { expected, actual }) => {
+                assert_eq!(expected, 4);
+                assert_eq!(actual, 2);
+            }
+            other => panic!("unexpected build result: {other:?}"),
+        }
     }
 
     #[test]
@@ -202,7 +201,7 @@ mod tests {
             .expect("dense build should succeed");
 
         assert_eq!(tensor.storage().tag(), ExecutionTag::Cpu);
-        assert_eq!(tensor.data(), &[0.0, 0.0]);
+        assert_eq!(tensor.data(), vec![0.0, 0.0]);
     }
 
     #[test]
@@ -213,6 +212,6 @@ mod tests {
             .expect("dense build should succeed");
 
         tensor.fill(9.5).expect("fill op should succeed");
-        assert_eq!(tensor.data(), &[9.5, 9.5, 9.5, 9.5]);
+        assert_eq!(tensor.data(), vec![9.5, 9.5, 9.5, 9.5]);
     }
 }

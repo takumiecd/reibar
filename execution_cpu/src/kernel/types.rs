@@ -1,5 +1,7 @@
 use schema::{KernelArg, KernelArgs, KernelArgsError};
 
+use crate::storage::CpuStorage;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CpuKernelContext {
     worker_threads: usize,
@@ -26,10 +28,10 @@ impl Default for CpuKernelContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct CpuKernelArgs {
     context: CpuKernelContext,
-    args: KernelArgs<()>,
+    args: KernelArgs<CpuStorage>,
 }
 
 impl CpuKernelArgs {
@@ -46,15 +48,15 @@ impl CpuKernelArgs {
         &self.context
     }
 
-    pub fn args(&self) -> &KernelArgs<()> {
+    pub fn args(&self) -> &KernelArgs<CpuStorage> {
         &self.args
     }
 
-    pub fn args_mut(&mut self) -> &mut KernelArgs<()> {
+    pub fn args_mut(&mut self) -> &mut KernelArgs<CpuStorage> {
         &mut self.args
     }
 
-    pub fn insert(&mut self, arg: KernelArg<()>) -> Result<(), KernelArgsError> {
+    pub fn insert(&mut self, arg: KernelArg<CpuStorage>) -> Result<(), KernelArgsError> {
         self.args.insert(arg)
     }
 

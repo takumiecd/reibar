@@ -3,7 +3,7 @@ use crate::backend::{BackendBundle, for_each_backend};
 
 macro_rules! define_kernel_args_types {
     ($($variant:ident => $bundle:path),+ $(,)?) => {
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone)]
         pub enum KernelArgs {
             $($variant(<$bundle as BackendBundle>::KernelArgs)),+
         }

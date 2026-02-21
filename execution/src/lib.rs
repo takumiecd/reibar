@@ -1,5 +1,6 @@
 mod backend;
 mod capability;
+mod contracts;
 mod kernel;
 mod storage;
 mod tag;
@@ -7,10 +8,12 @@ mod tag;
 pub use capability::Capability;
 pub use execution_cpu::{
     CpuBundle, CpuCapability, CpuExecution, CpuKernelArgs, CpuKernelContext, CpuKernelFn,
-    CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata, CpuStorage,
+    CpuKernelLaunchError, CpuKernelLauncher, CpuKernelMetadata, CpuStorage, CpuStorageAllocError,
+    CpuStorageContext,
 };
+pub use contracts::*;
 pub use kernel::{KernelArgs, KernelContext, KernelLaunchError, KernelLauncher, KernelMetadata};
-pub use storage::Storage;
+pub use storage::{Storage, StorageAllocError, StorageContext, StorageRequest};
 pub use tag::{Execution, ExecutionTag};
 
 #[cfg(test)]
@@ -22,7 +25,7 @@ mod tests {
     use super::{
         Capability, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchError, CpuKernelMetadata,
         CpuStorage, Execution, ExecutionTag, KernelContext, KernelLauncher, KernelMetadata,
-        Storage,
+        Storage, StorageContext, StorageRequest,
     };
 
     static KERNEL_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -43,18 +46,32 @@ mod tests {
 
     #[test]
     fn storage_from_tag_is_cpu_storage() {
-        let storage = Storage::Cpu(CpuStorage::new(vec![2.5, 2.5, 2.5]));
+        let storage = Storage::Cpu(CpuStorage::new(encode_f32_slice(&[2.5, 2.5, 2.5])));
         assert_eq!(storage.tag(), ExecutionTag::Cpu);
-        assert_eq!(storage.len(), 3);
+        assert_eq!(storage.len_bytes(), 12);
         match &storage {
             Storage::Cpu(cpu_storage) => {
-                let values = cpu_storage.with_read(|slice| slice.to_vec());
+                let values = cpu_storage.with_read_bytes(decode_f32_vec);
                 assert_eq!(values, vec![2.5, 2.5, 2.5]);
             }
         }
 
         let execution = Execution::cpu();
         assert_eq!(execution.tag(), ExecutionTag::Cpu);
+    }
+
+    #[test]
+    fn storage_can_be_allocated_from_context() {
+        let context = StorageContext::cpu();
+        let storage = Storage::allocate(
+            ExecutionTag::Cpu,
+            &context,
+            StorageRequest::new(16).with_alignment(4),
+        )
+        .expect("storage allocation should succeed");
+
+        assert_eq!(storage.tag(), ExecutionTag::Cpu);
+        assert_eq!(storage.len_bytes(), 16);
     }
 
     #[test]
@@ -72,7 +89,10 @@ mod tests {
         let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
         let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::F32);
 
-        args.insert(KernelArg::storage(input_key.clone(), CpuStorage::new(vec![0.0])))
+        args.insert(KernelArg::storage(
+            input_key.clone(),
+            CpuStorage::new(vec![0u8; 4]),
+        ))
             .expect("storage insertion should succeed");
         args.insert(KernelArg::f32(alpha_key.clone(), 1.0))
             .expect("alpha insertion should succeed");
@@ -109,5 +129,23 @@ mod tests {
     fn capability_follows_execution_tag() {
         let capability = Capability::from_execution_tag(ExecutionTag::Cpu);
         assert_eq!(capability.tag(), ExecutionTag::Cpu);
+    }
+
+    fn encode_f32_slice(values: &[f32]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(values.len() * std::mem::size_of::<f32>());
+        for value in values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        bytes
+    }
+
+    fn decode_f32_vec(bytes: &[u8]) -> Vec<f32> {
+        let mut chunks = bytes.chunks_exact(std::mem::size_of::<f32>());
+        let values: Vec<f32> = chunks
+            .by_ref()
+            .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        assert!(chunks.remainder().is_empty());
+        values
     }
 }

@@ -3,6 +3,7 @@ mod capability;
 mod execution;
 pub mod kernel;
 mod storage;
+mod storage_context;
 
 pub use bundle::CpuBundle;
 pub use capability::CpuCapability;
@@ -11,4 +12,5 @@ pub use kernel::{
     CpuKernelArgs, CpuKernelContext, CpuKernelFn, CpuKernelLaunchError, CpuKernelLauncher,
     CpuKernelMetadata,
 };
-pub use storage::CpuStorage;
+pub use storage::{CpuStorage, CpuStorageAllocError};
+pub use storage_context::CpuStorageContext;

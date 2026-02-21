@@ -31,7 +31,20 @@ pub fn launch(args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
         ))
     })?;
 
-    out_storage.with_write(|out| out.fill(value));
+    out_storage
+        .with_write_bytes(|out| {
+            if out.len() % std::mem::size_of::<f32>() != 0 {
+                return Err(CpuKernelLaunchError::new(
+                    "cpu.fill requires output byte-size to be multiple of f32 size",
+                ));
+            }
+
+            let pattern = value.to_ne_bytes();
+            for chunk in out.chunks_exact_mut(std::mem::size_of::<f32>()) {
+                chunk.copy_from_slice(&pattern);
+            }
+            Ok(())
+        })?;
 
     Ok(())
 }
@@ -46,21 +59,21 @@ mod tests {
     #[test]
     fn launch_accepts_expected_args() {
         let mut args = CpuKernelArgs::new();
-        let out = CpuStorage::new(vec![0.0, 0.0, 0.0, 0.0]);
+        let out = CpuStorage::new(vec![0u8; 16]);
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
         args.insert(KernelArg::f32(value_key(), 3.0))
             .expect("value insertion should succeed");
 
         launch(&args).expect("fill launch should validate arguments");
-        let values = out.with_read(|slice| slice.to_vec());
+        let values = out.with_read_bytes(decode_f32_vec);
         assert_eq!(values, vec![3.0, 3.0, 3.0, 3.0]);
     }
 
     #[test]
     fn launch_rejects_missing_value() {
         let mut args = CpuKernelArgs::new();
-        args.insert(KernelArg::storage(output_key(), CpuStorage::new(vec![0.0, 0.0])))
+        args.insert(KernelArg::storage(output_key(), CpuStorage::new(vec![0u8; 8])))
             .expect("out insertion should succeed");
 
         let err = launch(&args).expect_err("fill launch should fail without value");
@@ -68,5 +81,15 @@ mod tests {
 
         let missing = ArgKey::new(ArgRole::Param, "value", ArgKind::F32);
         assert_eq!(missing, value_key());
+    }
+
+    fn decode_f32_vec(bytes: &[u8]) -> Vec<f32> {
+        let mut chunks = bytes.chunks_exact(std::mem::size_of::<f32>());
+        let values: Vec<f32> = chunks
+            .by_ref()
+            .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        assert!(chunks.remainder().is_empty());
+        values
     }
 }

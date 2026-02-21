@@ -1,3 +1,7 @@
+mod context;
+
+pub use context::{StorageAllocError, StorageContext, StorageRequest};
+
 use crate::ExecutionTag;
 use crate::backend::{BackendBundle, for_each_backend};
 
@@ -15,9 +19,36 @@ macro_rules! define_storage_types {
                 }
             }
 
-            pub fn len(&self) -> usize {
+            pub fn len_bytes(&self) -> usize {
                 match self {
-                    $(Self::$variant(storage) => <$bundle as BackendBundle>::storage_len(storage)),+
+                    $(Self::$variant(storage) => <$bundle as BackendBundle>::storage_len_bytes(storage)),+
+                }
+            }
+
+            pub fn allocate(
+                tag: ExecutionTag,
+                context: &StorageContext,
+                request: StorageRequest,
+            ) -> Result<Self, StorageAllocError> {
+                if tag != context.tag() {
+                    return Err(StorageAllocError::ContextTagMismatch {
+                        requested: tag,
+                        context: context.tag(),
+                    });
+                }
+
+                match context {
+                    $(
+                        StorageContext::$variant(storage_context) => {
+                            <$bundle as BackendBundle>::allocate_storage(
+                                storage_context,
+                                request.bytes,
+                                request.alignment,
+                            )
+                            .map(Self::$variant)
+                            .map_err(StorageAllocError::$variant)
+                        }
+                    ),+
                 }
             }
         }

@@ -1,6 +1,9 @@
 use std::sync::{Mutex, OnceLock};
 
-use execution::{CpuKernelArgs, CpuStorage, ExecutionTag, KernelArgs, Storage};
+use execution::{
+    CpuKernelArgs, ExecutionTag, KernelArgs, Storage, StorageAllocError, StorageContext,
+    StorageRequest,
+};
 use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
@@ -58,7 +61,7 @@ impl DenseTensorImpl {
 
     pub fn data(&self) -> Vec<f32> {
         match &self.storage {
-            Storage::Cpu(storage) => storage.with_read(|slice| slice.to_vec()),
+            Storage::Cpu(storage) => storage.with_read_bytes(decode_f32_vec),
         }
     }
 }
@@ -124,6 +127,11 @@ impl DenseBuilder {
 
     pub fn build(self) -> Result<DenseTensorImpl, DenseBuildError> {
         let expected = element_count(&self.shape)?;
+        let bytes = expected
+            .checked_mul(std::mem::size_of::<f32>())
+            .ok_or(DenseBuildError::ShapeOverflow)?;
+        let request = StorageRequest::new(bytes).with_alignment(std::mem::align_of::<f32>());
+        let storage_context = StorageContext::from_execution_tag(self.execution_tag);
         let storage = match self.data {
             Some(data) => {
                 if data.len() != expected {
@@ -132,13 +140,27 @@ impl DenseBuilder {
                         actual: data.len(),
                     });
                 }
-                match self.execution_tag {
-                    ExecutionTag::Cpu => Storage::Cpu(CpuStorage::new(data)),
+                let storage = Storage::allocate(self.execution_tag, &storage_context, request)
+                    .map_err(DenseBuildError::StorageAlloc)?;
+                let encoded = encode_f32_slice(&data);
+                match &storage {
+                    Storage::Cpu(cpu) => cpu.with_write_bytes(|slice| slice.copy_from_slice(&encoded)),
                 }
+                storage
             }
-            None => match self.execution_tag {
-                ExecutionTag::Cpu => Storage::Cpu(CpuStorage::new(vec![self.fill_value; expected])),
-            },
+            None => {
+                let storage = Storage::allocate(self.execution_tag, &storage_context, request)
+                    .map_err(DenseBuildError::StorageAlloc)?;
+                let pattern = self.fill_value.to_ne_bytes();
+                match &storage {
+                    Storage::Cpu(cpu) => cpu.with_write_bytes(|slice| {
+                        for chunk in slice.chunks_exact_mut(std::mem::size_of::<f32>()) {
+                            chunk.copy_from_slice(&pattern);
+                        }
+                    }),
+                }
+                storage
+            }
         };
 
         Ok(DenseTensorImpl {
@@ -151,6 +173,7 @@ impl DenseBuilder {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DenseBuildError {
     DataLengthMismatch { expected: usize, actual: usize },
+    StorageAlloc(StorageAllocError),
     ShapeOverflow,
 }
 
@@ -158,6 +181,24 @@ fn element_count(shape: &[usize]) -> Result<usize, DenseBuildError> {
     shape.iter().try_fold(1usize, |acc, dim| {
         acc.checked_mul(*dim).ok_or(DenseBuildError::ShapeOverflow)
     })
+}
+
+fn encode_f32_slice(values: &[f32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(values.len() * std::mem::size_of::<f32>());
+    for value in values {
+        bytes.extend_from_slice(&value.to_ne_bytes());
+    }
+    bytes
+}
+
+fn decode_f32_vec(bytes: &[u8]) -> Vec<f32> {
+    let mut chunks = bytes.chunks_exact(std::mem::size_of::<f32>());
+    let values: Vec<f32> = chunks
+        .by_ref()
+        .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect();
+    debug_assert!(chunks.remainder().is_empty());
+    values
 }
 
 #[cfg(test)]

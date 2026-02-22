@@ -7,6 +7,7 @@ name = "dense_impl"
 version = "0.1.0"
 dependencies = [
  "execution",
+ "op_contracts",
  "runtime",
  "schema",
 ]
@@ -34,6 +35,19 @@ dependencies = [
  "execution_contracts",
  "schema",
 ]
+
+[[package]]
+name = "op"
+version = "0.1.0"
+dependencies = [
+ "dense_impl",
+ "op_contracts",
+ "tensor",
+]
+
+[[package]]
+name = "op_contracts"
+version = "0.1.0"
 
 [[package]]
 name = "runtime"

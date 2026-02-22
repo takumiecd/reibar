@@ -1,14 +1,8 @@
-use std::sync::{Mutex, OnceLock};
+use execution::{ExecutionTag, Storage, StorageAllocError, StorageContext, StorageRequest};
+use op_contracts::FillOp;
+use schema::DType;
 
-use execution::{
-    CpuKernelArgs, ExecutionTag, KernelArgs, Storage, StorageAllocError, StorageContext,
-    StorageRequest,
-};
-use runtime::{
-    DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
-    V1KeyParts,
-};
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
+pub mod ops;
 
 #[derive(Debug, Clone)]
 pub struct DenseTensorImpl {
@@ -29,36 +23,6 @@ impl DenseTensorImpl {
         self.storage.tag()
     }
 
-    pub fn fill(&mut self, value: f32) -> Result<(), DenseOpError> {
-        let mut cpu_args = CpuKernelArgs::new();
-        let out = match &self.storage {
-            Storage::Cpu(storage) => storage.clone(),
-        };
-        cpu_args
-            .insert(KernelArg::storage(fill_output_key(), out))
-            .map_err(DenseOpError::KernelArgs)?;
-        cpu_args
-            .insert(KernelArg::f32(fill_value_key(), value))
-            .map_err(DenseOpError::KernelArgs)?;
-        let args = KernelArgs::Cpu(cpu_args);
-
-        let seed = SeedSpec::V1(V1KeyParts {
-            execution: self.execution_tag(),
-            op: OpTag::Fill,
-            selector: 0,
-        });
-
-        let dispatcher = dense_dispatcher();
-        let mut dispatcher = dispatcher
-            .lock()
-            .map_err(|_| DenseOpError::DispatcherPoisoned)?;
-        dispatcher
-            .dispatch_seed(seed, &args)
-            .map_err(DenseOpError::Dispatch)?;
-
-        Ok(())
-    }
-
     pub fn data(&self) -> Vec<f32> {
         match &self.storage {
             Storage::Cpu(storage) => {
@@ -69,30 +33,12 @@ impl DenseTensorImpl {
     }
 }
 
-#[derive(Debug)]
-pub enum DenseOpError {
-    DispatcherPoisoned,
-    KernelArgs(schema::KernelArgsError),
-    Dispatch(DispatchError),
-}
+impl FillOp for DenseTensorImpl {
+    type Error = ops::fill::DenseFillError;
 
-fn fill_output_key() -> ArgKey {
-    ArgKey::new(ArgRole::Output, "out", ArgKind::Storage)
-}
-
-fn fill_value_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "value", ArgKind::F32)
-}
-
-fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
-    static DISPATCHER: OnceLock<Mutex<Dispatcher>> = OnceLock::new();
-    DISPATCHER.get_or_init(|| {
-        let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1);
-        dispatcher
-            .initialize_builtins()
-            .expect("dense builtins initialization must succeed");
-        Mutex::new(dispatcher)
-    })
+    fn fill_inplace(&mut self, value: f32) -> Result<(), Self::Error> {
+        ops::fill::exec(self, value)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -209,6 +155,7 @@ fn decode_f32_vec(bytes: &[u8]) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use execution::ExecutionTag;
+    use op_contracts::FillOp;
 
     use super::{DenseBuildError, DenseBuilder};
 
@@ -257,7 +204,7 @@ mod tests {
             .build()
             .expect("dense build should succeed");
 
-        tensor.fill(9.5).expect("fill op should succeed");
+        tensor.fill_inplace(9.5).expect("fill op should succeed");
         assert_eq!(tensor.data(), vec![9.5, 9.5, 9.5, 9.5]);
     }
 }

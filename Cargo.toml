@@ -1,10 +1,12 @@
 [workspace]
 members = [
+    "api/op",
     "api/tensor",
     "core/dense_impl",
     "execution",
     "execution_contracts",
     "execution_cpu",
+    "op_contracts",
     "runtime",
     "schema",
 ]

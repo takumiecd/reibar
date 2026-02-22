@@ -1,189 +1,28 @@
-use execution::{ExecutionTag, Storage, StorageAllocError, StorageContext, StorageRequest};
-use op_contracts::FillOp;
-use schema::DType;
-
+mod builder;
 pub mod ops;
+mod tensor;
 
-#[derive(Debug, Clone)]
-pub struct DenseTensorImpl {
-    shape: Vec<usize>,
-    storage: Storage,
-}
-
-impl DenseTensorImpl {
-    pub fn shape(&self) -> &[usize] {
-        &self.shape
-    }
-
-    pub fn storage(&self) -> &Storage {
-        &self.storage
-    }
-
-    pub fn execution_tag(&self) -> ExecutionTag {
-        self.storage.tag()
-    }
-
-    pub fn data(&self) -> Vec<f32> {
-        match &self.storage {
-            Storage::Cpu(storage) => {
-                debug_assert_eq!(storage.dtype(), DType::F32);
-                storage.buffer().with_read_bytes(decode_f32_vec)
-            }
-        }
-    }
-}
-
-impl FillOp for DenseTensorImpl {
-    type Error = ops::fill::DenseFillError;
-
-    fn fill_inplace(&mut self, value: f32) -> Result<(), Self::Error> {
-        ops::fill::exec(self, value)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DenseBuilder {
-    shape: Vec<usize>,
-    data: Option<Vec<f32>>,
-    fill_value: f32,
-    execution_tag: ExecutionTag,
-}
-
-impl DenseBuilder {
-    pub fn new(shape: Vec<usize>) -> Self {
-        Self {
-            shape,
-            data: None,
-            fill_value: 0.0,
-            execution_tag: ExecutionTag::Cpu,
-        }
-    }
-
-    pub fn with_data(mut self, data: Vec<f32>) -> Self {
-        self.data = Some(data);
-        self
-    }
-
-    pub fn with_fill(mut self, value: f32) -> Self {
-        self.fill_value = value;
-        self
-    }
-
-    pub fn with_execution(mut self, execution_tag: ExecutionTag) -> Self {
-        self.execution_tag = execution_tag;
-        self
-    }
-
-    pub fn build(self) -> Result<DenseTensorImpl, DenseBuildError> {
-        let expected = element_count(&self.shape)?;
-        let bytes = expected
-            .checked_mul(std::mem::size_of::<f32>())
-            .ok_or(DenseBuildError::ShapeOverflow)?;
-        let request = StorageRequest::new(bytes, DType::F32);
-        let storage_context = StorageContext::from_execution_tag(self.execution_tag);
-        let storage = match self.data {
-            Some(data) => {
-                if data.len() != expected {
-                    return Err(DenseBuildError::DataLengthMismatch {
-                        expected,
-                        actual: data.len(),
-                    });
-                }
-                let storage = Storage::allocate(self.execution_tag, &storage_context, request)
-                    .map_err(DenseBuildError::StorageAlloc)?;
-                let encoded = encode_f32_slice(&data);
-                match &storage {
-                    Storage::Cpu(cpu) => cpu
-                        .buffer()
-                        .with_write_bytes(|slice| slice.copy_from_slice(&encoded)),
-                }
-                storage
-            }
-            None => {
-                let storage = Storage::allocate(self.execution_tag, &storage_context, request)
-                    .map_err(DenseBuildError::StorageAlloc)?;
-                let pattern = self.fill_value.to_ne_bytes();
-                match &storage {
-                    Storage::Cpu(cpu) => cpu.buffer().with_write_bytes(|slice| {
-                        for chunk in slice.chunks_exact_mut(std::mem::size_of::<f32>()) {
-                            chunk.copy_from_slice(&pattern);
-                        }
-                    }),
-                }
-                storage
-            }
-        };
-
-        Ok(DenseTensorImpl {
-            shape: self.shape,
-            storage,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum DenseBuildError {
-    DataLengthMismatch { expected: usize, actual: usize },
-    StorageAlloc(StorageAllocError),
-    ShapeOverflow,
-}
-
-fn element_count(shape: &[usize]) -> Result<usize, DenseBuildError> {
-    shape.iter().try_fold(1usize, |acc, dim| {
-        acc.checked_mul(*dim).ok_or(DenseBuildError::ShapeOverflow)
-    })
-}
-
-fn encode_f32_slice(values: &[f32]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(values.len() * std::mem::size_of::<f32>());
-    for value in values {
-        bytes.extend_from_slice(&value.to_ne_bytes());
-    }
-    bytes
-}
-
-fn decode_f32_vec(bytes: &[u8]) -> Vec<f32> {
-    let mut chunks = bytes.chunks_exact(std::mem::size_of::<f32>());
-    let values: Vec<f32> = chunks
-        .by_ref()
-        .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
-        .collect();
-    debug_assert!(chunks.remainder().is_empty());
-    values
-}
+pub use builder::{DenseBuilder, DenseBuildError};
+pub use tensor::DenseTensorImpl;
 
 #[cfg(test)]
 mod tests {
     use execution::ExecutionTag;
     use op_contracts::FillOp;
 
-    use super::{DenseBuildError, DenseBuilder};
+    use super::{DenseBuilder, DenseBuildError};
 
     #[test]
-    fn build_from_fill() {
-        let tensor = DenseBuilder::new(vec![2, 3])
-            .with_fill(1.5)
+    fn build_then_fill() {
+        let mut tensor = DenseBuilder::new(vec![2, 3])
             .build()
             .expect("dense build should succeed");
+
+        tensor.fill_inplace(1.5).expect("fill should succeed");
 
         assert_eq!(tensor.shape(), &[2, 3]);
         assert_eq!(tensor.data(), vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
         assert_eq!(tensor.execution_tag(), ExecutionTag::Cpu);
-    }
-
-    #[test]
-    fn build_fails_on_data_len_mismatch() {
-        let result = DenseBuilder::new(vec![2, 2])
-            .with_data(vec![1.0, 2.0])
-            .build();
-
-        match result {
-            Err(DenseBuildError::DataLengthMismatch { expected, actual }) => {
-                assert_eq!(expected, 4);
-                assert_eq!(actual, 2);
-            }
-            other => panic!("unexpected build result: {other:?}"),
-        }
     }
 
     #[test]
@@ -200,11 +39,19 @@ mod tests {
     #[test]
     fn fill_op_dispatches_and_updates_storage() {
         let mut tensor = DenseBuilder::new(vec![2, 2])
-            .with_data(vec![1.0, 2.0, 3.0, 4.0])
             .build()
             .expect("dense build should succeed");
 
         tensor.fill_inplace(9.5).expect("fill op should succeed");
         assert_eq!(tensor.data(), vec![9.5, 9.5, 9.5, 9.5]);
+    }
+
+    #[test]
+    fn shape_overflow_is_detected() {
+        let result = DenseBuilder::new(vec![usize::MAX, 2]).build();
+        match result {
+            Err(DenseBuildError::ShapeOverflow) => {}
+            other => panic!("expected ShapeOverflow, got: {other:?}"),
+        }
     }
 }

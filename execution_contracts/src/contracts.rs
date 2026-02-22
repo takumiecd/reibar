@@ -27,3 +27,4 @@ pub trait ExecutionKernelLauncher: Clone + Send + Sync + 'static {
     fn to_metadata(&self) -> Self::Metadata;
     fn launch(&self, args: &Self::Args) -> Result<(), Self::Error>;
 }
+

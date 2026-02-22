@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+execution_contracts = { path = "../execution_contracts" }
 execution_cpu = { path = "../execution_cpu" }
 schema = { path = "../schema" }

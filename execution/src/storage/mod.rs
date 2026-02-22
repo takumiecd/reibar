@@ -3,7 +3,7 @@ mod context;
 pub use context::{StorageAllocError, StorageContext, StorageRequest};
 
 use crate::ExecutionTag;
-use crate::backend::{BackendBundle, for_each_backend};
+use execution_contracts::BackendBundle;
 use schema::DType;
 
 macro_rules! define_storage_types {
@@ -61,13 +61,6 @@ macro_rules! define_storage_types {
             }
         }
 
-        $(
-        impl From<<$bundle as BackendBundle>::Storage> for Storage {
-            fn from(value: <$bundle as BackendBundle>::Storage) -> Self {
-                Storage::$variant(value)
-            }
-        }
-        )+
     };
 }
 

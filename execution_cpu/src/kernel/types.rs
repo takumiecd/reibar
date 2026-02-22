@@ -165,10 +165,7 @@ impl CpuKernelMetadata {
     }
 
     pub fn into_launcher(self) -> CpuKernelLauncher {
-        CpuKernelLauncher {
-            launch_config: CpuKernelLaunchConfig::new(self.kernel_name),
-            kernel_fn: self.kernel_fn,
-        }
+        execution_contracts::ExecutionKernelMetadata::into_launcher(self)
     }
 }
 
@@ -201,10 +198,42 @@ impl CpuKernelLauncher {
     }
 
     pub fn to_metadata(&self) -> CpuKernelMetadata {
-        CpuKernelMetadata::new(self.kernel_name().to_string(), self.kernel_fn)
+        execution_contracts::ExecutionKernelLauncher::to_metadata(self)
     }
 
     pub fn launch(&self, args: &CpuKernelArgs) -> Result<(), CpuKernelLaunchError> {
+        execution_contracts::ExecutionKernelLauncher::launch(self, args)
+    }
+}
+
+impl execution_contracts::ExecutionKernelContext for CpuKernelContext {}
+
+impl execution_contracts::ExecutionKernelArgs for CpuKernelArgs {}
+
+impl execution_contracts::ExecutionKernelMetadata for CpuKernelMetadata {
+    type Launcher = CpuKernelLauncher;
+
+    fn into_launcher(self) -> Self::Launcher {
+        CpuKernelLauncher {
+            launch_config: CpuKernelLaunchConfig::new(self.kernel_name),
+            kernel_fn: self.kernel_fn,
+        }
+    }
+}
+
+impl execution_contracts::ExecutionKernelLauncher for CpuKernelLauncher {
+    type Metadata = CpuKernelMetadata;
+    type Args = CpuKernelArgs;
+    type Error = CpuKernelLaunchError;
+
+    fn to_metadata(&self) -> Self::Metadata {
+        CpuKernelMetadata {
+            kernel_name: self.launch_config.kernel_name.clone(),
+            kernel_fn: self.kernel_fn,
+        }
+    }
+
+    fn launch(&self, args: &Self::Args) -> Result<(), Self::Error> {
         (self.kernel_fn)(args, &self.launch_config)
     }
 }

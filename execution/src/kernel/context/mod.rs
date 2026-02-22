@@ -1,5 +1,5 @@
 use crate::ExecutionTag;
-use crate::backend::{BackendBundle, for_each_backend};
+use execution_contracts::BackendBundle;
 
 macro_rules! define_kernel_context_types {
     ($($variant:ident => $bundle:path),+ $(,)?) => {
@@ -22,13 +22,6 @@ macro_rules! define_kernel_context_types {
             }
         }
 
-        $(
-        impl From<<$bundle as BackendBundle>::KernelContext> for KernelContext {
-            fn from(value: <$bundle as BackendBundle>::KernelContext) -> Self {
-                Self::$variant(value)
-            }
-        }
-        )+
     };
 }
 

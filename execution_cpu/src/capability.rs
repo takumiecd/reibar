@@ -23,3 +23,5 @@ impl Default for CpuCapability {
         Self { worker_threads: 1 }
     }
 }
+
+impl execution_contracts::ExecutionCapability for CpuCapability {}

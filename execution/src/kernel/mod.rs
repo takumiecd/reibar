@@ -4,7 +4,7 @@ mod context;
 pub use args::KernelArgs;
 pub use context::KernelContext;
 
-use crate::backend::{BackendBundle, for_each_backend};
+use execution_contracts::BackendBundle;
 
 use crate::ExecutionTag;
 

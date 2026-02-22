@@ -1,4 +1,4 @@
-use crate::backend::{BackendBundle, for_each_backend};
+use execution_contracts::BackendBundle;
 
 macro_rules! define_execution_types {
     ($($variant:ident => $bundle:path),+ $(,)?) => {

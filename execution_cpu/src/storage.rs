@@ -216,3 +216,13 @@ impl CpuStorage {
         &self.buffer
     }
 }
+
+impl execution_contracts::ExecutionStorage for CpuStorage {
+    fn len_bytes(&self) -> usize {
+        self.len_bytes()
+    }
+
+    fn dtype(&self) -> DType {
+        self.dtype()
+    }
+}

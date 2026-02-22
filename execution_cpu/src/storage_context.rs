@@ -23,3 +23,5 @@ impl Default for CpuStorageContext {
         Self { numa_node: 0 }
     }
 }
+
+impl execution_contracts::ExecutionStorageContext for CpuStorageContext {}

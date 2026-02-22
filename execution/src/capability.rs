@@ -1,5 +1,5 @@
 use crate::ExecutionTag;
-use crate::backend::{BackendBundle, for_each_backend};
+use execution_contracts::BackendBundle;
 
 macro_rules! define_capability_types {
     ($($variant:ident => $bundle:path),+ $(,)?) => {

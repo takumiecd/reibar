@@ -1,5 +1,5 @@
 use crate::ExecutionTag;
-use crate::backend::{BackendBundle, for_each_backend};
+use execution_contracts::BackendBundle;
 use schema::DType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

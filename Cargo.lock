@@ -15,7 +15,15 @@ dependencies = [
 name = "execution"
 version = "0.1.0"
 dependencies = [
+ "execution_contracts",
  "execution_cpu",
+ "schema",
+]
+
+[[package]]
+name = "execution_contracts"
+version = "0.1.0"
+dependencies = [
  "schema",
 ]
 
@@ -23,6 +31,7 @@ dependencies = [
 name = "execution_cpu"
 version = "0.1.0"
 dependencies = [
+ "execution_contracts",
  "schema",
 ]
 

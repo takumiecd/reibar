@@ -20,9 +20,3 @@ macro_rules! define_kernel_args_types {
 }
 
 for_each_backend!(define_kernel_args_types);
-
-impl KernelArgs {
-    pub fn cpu(args: execution_cpu::CpuKernelArgs) -> Self {
-        Self::Cpu(args)
-    }
-}

@@ -40,7 +40,7 @@ impl DenseTensorImpl {
         cpu_args
             .insert(KernelArg::f32(fill_value_key(), value))
             .map_err(DenseOpError::KernelArgs)?;
-        let args = KernelArgs::cpu(cpu_args);
+        let args = KernelArgs::Cpu(cpu_args);
 
         let seed = SeedSpec::V1(V1KeyParts {
             execution: self.execution_tag(),

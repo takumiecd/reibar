@@ -31,9 +31,3 @@ macro_rules! define_execution_types {
 }
 
 for_each_backend!(define_execution_types);
-
-impl Execution {
-    pub fn cpu() -> Self {
-        ExecutionTag::Cpu.execution()
-    }
-}

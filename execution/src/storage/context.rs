@@ -57,9 +57,3 @@ macro_rules! define_storage_context_types {
 }
 
 for_each_backend!(define_storage_context_types);
-
-impl StorageContext {
-    pub fn cpu() -> Self {
-        Self::Cpu(execution_cpu::CpuStorageContext::new())
-    }
-}

@@ -122,7 +122,7 @@ mod tests {
             )
             .expect("copy registration should succeed");
 
-        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let args = KernelArgs::Cpu(CpuKernelArgs::new());
 
         dispatcher
             .dispatch(DispatchRequest {
@@ -166,7 +166,7 @@ mod tests {
         KERNEL_CALL_COUNT_V2_MISMATCH.store(0, Ordering::SeqCst);
 
         let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1);
-        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let args = KernelArgs::Cpu(CpuKernelArgs::new());
         let key = V2KeyCodec::encode(V2KeyParts {
             op: OpTag::Fill,
             layout: 0,
@@ -199,7 +199,7 @@ mod tests {
         KERNEL_CALL_COUNT_V2_ACCEPT.store(0, Ordering::SeqCst);
 
         let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V2);
-        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let args = KernelArgs::Cpu(CpuKernelArgs::new());
         let key = ResolverKind::V2.resolve(ExecutionTag::Cpu, OpTag::Fill, &args);
 
         dispatcher
@@ -260,7 +260,7 @@ mod tests {
 
         let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1)
             .with_max_fallback_steps(8);
-        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let args = KernelArgs::Cpu(CpuKernelArgs::new());
         let generic_key = V1KeyCodec::encode(V1KeyParts {
             execution: ExecutionTag::Cpu,
             op: OpTag::Fill,
@@ -297,7 +297,7 @@ mod tests {
         KERNEL_CALL_COUNT_V1_SEED.store(0, Ordering::SeqCst);
 
         let mut dispatcher = Dispatcher::new(KernelRegistryConfig::default(), KeyVersion::V1);
-        let args = KernelArgs::cpu(CpuKernelArgs::new());
+        let args = KernelArgs::Cpu(CpuKernelArgs::new());
         let generic_seed = SeedSpec::V1(V1KeyParts {
             execution: ExecutionTag::Cpu,
             op: OpTag::Fill,

@@ -31,7 +31,7 @@ mod tests {
 
     use super::{
         Capability, CpuBuffer, CpuKernelArgs, CpuKernelContext, CpuKernelLaunchConfig,
-        CpuKernelLaunchError, CpuKernelMetadata, CpuStorage, Execution, ExecutionTag,
+        CpuKernelLaunchError, CpuKernelMetadata, CpuStorage, ExecutionTag,
         KernelContext, KernelLauncher, KernelMetadata, Storage, StorageContext, StorageRequest,
     };
 
@@ -77,13 +77,13 @@ mod tests {
             }
         }
 
-        let execution = Execution::cpu();
+        let execution = ExecutionTag::Cpu.execution();
         assert_eq!(execution.tag(), ExecutionTag::Cpu);
     }
 
     #[test]
     fn storage_can_be_allocated_from_context() {
-        let context = StorageContext::cpu();
+        let context = StorageContext::from_execution_tag(ExecutionTag::Cpu);
         let storage = Storage::allocate(
             ExecutionTag::Cpu,
             &context,
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn kernel_context_tag_is_execution_specific() {
-        let context = KernelContext::cpu();
+        let context = KernelContext::from_execution_tag(ExecutionTag::Cpu);
         assert_eq!(context.tag(), ExecutionTag::Cpu);
     }
 

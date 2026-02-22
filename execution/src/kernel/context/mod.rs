@@ -26,9 +26,3 @@ macro_rules! define_kernel_context_types {
 }
 
 for_each_backend!(define_kernel_context_types);
-
-impl KernelContext {
-    pub fn cpu() -> Self {
-        Self::Cpu(execution_cpu::CpuKernelContext::new())
-    }
-}

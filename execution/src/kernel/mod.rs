@@ -84,9 +84,3 @@ macro_rules! define_kernel_types {
 }
 
 for_each_backend!(define_kernel_types);
-
-impl KernelMetadata {
-    pub fn cpu(name: impl Into<String>, kernel_fn: execution_cpu::CpuKernelFn) -> Self {
-        Self::Cpu(execution_cpu::CpuKernelMetadata::new(name, kernel_fn))
-    }
-}

@@ -34,3 +34,10 @@ pub fn exec_f32(tensor: &DenseTensorImpl) -> Result<Vec<f32>, DenseToHostError> 
 
 #[derive(Debug)]
 pub enum DenseToHostError {}
+
+impl op_contracts::ToHostOp<DenseTensorImpl> for super::DenseOps {
+    type Error = DenseToHostError;
+    fn to_host(&self, tensor: &DenseTensorImpl) -> Result<DenseTensorImpl, Self::Error> {
+        exec(tensor)
+    }
+}

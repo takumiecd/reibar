@@ -69,3 +69,10 @@ fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
         Mutex::new(dispatcher)
     })
 }
+
+impl op_contracts::FillOp<DenseTensorImpl> for super::DenseOps {
+    type Error = DenseFillError;
+    fn fill_inplace(&self, tensor: &mut DenseTensorImpl, value: f32) -> Result<(), Self::Error> {
+        exec(tensor, value)
+    }
+}

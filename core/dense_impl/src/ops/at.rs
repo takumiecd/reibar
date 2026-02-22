@@ -61,3 +61,22 @@ fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, D
             .sum::<usize>();
     Ok(pos)
 }
+
+impl op_contracts::ReadAtF32Op<DenseTensorImpl> for super::DenseOps {
+    type Error = DenseAtError;
+    fn read_at_f32(&self, tensor: &DenseTensorImpl, indices: &[usize]) -> Result<f32, Self::Error> {
+        exec_read(tensor, indices)
+    }
+}
+
+impl op_contracts::WriteAtF32Op<DenseTensorImpl> for super::DenseOps {
+    type Error = DenseAtError;
+    fn write_at_f32(
+        &self,
+        tensor: &DenseTensorImpl,
+        indices: &[usize],
+        value: f32,
+    ) -> Result<(), Self::Error> {
+        exec_write(tensor, indices, value)
+    }
+}

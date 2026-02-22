@@ -1,8 +1,12 @@
+use std::fmt;
+
+use dense_impl::ops::to_host;
 use dense_impl::DenseTensorImpl;
+use execution::ExecutionTag;
 
 use crate::tag::TensorTag;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Tensor {
     Dense(DenseTensorImpl),
 }
@@ -17,6 +21,24 @@ impl Tensor {
     pub fn shape(&self) -> &[usize] {
         match self {
             Self::Dense(t) => t.shape(),
+        }
+    }
+}
+
+impl fmt::Debug for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Dense(dense) if dense.execution_tag() == ExecutionTag::Cpu => {
+                let data = to_host::exec_f32(dense).unwrap_or_default();
+                f.debug_struct("Tensor")
+                    .field("shape", &dense.shape())
+                    .field("data", &data)
+                    .finish()
+            }
+            Self::Dense(dense) => f
+                .debug_struct("Tensor")
+                .field("shape", &dense.shape())
+                .finish(),
         }
     }
 }

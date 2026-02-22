@@ -41,6 +41,7 @@ name = "op"
 version = "0.1.0"
 dependencies = [
  "dense_impl",
+ "execution",
  "op_contracts",
  "tensor",
 ]
@@ -67,4 +68,5 @@ name = "tensor"
 version = "0.1.0"
 dependencies = [
  "dense_impl",
+ "execution",
 ]

@@ -1,4 +1,4 @@
-pub trait FillOp {
+pub trait FillOp<T> {
     type Error;
-    fn fill_inplace(&mut self, value: f32) -> Result<(), Self::Error>;
+    fn fill_inplace(&self, tensor: &mut T, value: f32) -> Result<(), Self::Error>;
 }

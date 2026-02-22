@@ -10,6 +10,10 @@ use schema::{ArgKey, ArgKind, ArgRole, KernelArg};
 use crate::DenseTensorImpl;
 
 pub fn exec(tensor: &mut DenseTensorImpl, value: f32) -> Result<(), DenseFillError> {
+    if !tensor.is_packed() {
+        return Err(DenseFillError::ViewNotSupported);
+    }
+
     let mut cpu_args = CpuKernelArgs::new();
     let out = match tensor.storage() {
         Storage::Cpu(storage) => storage.clone(),
@@ -41,6 +45,7 @@ pub fn exec(tensor: &mut DenseTensorImpl, value: f32) -> Result<(), DenseFillErr
 
 #[derive(Debug)]
 pub enum DenseFillError {
+    ViewNotSupported,
     DispatcherPoisoned,
     KernelArgs(schema::KernelArgsError),
     Dispatch(DispatchError),

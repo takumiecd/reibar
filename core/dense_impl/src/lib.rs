@@ -3,6 +3,7 @@ pub mod ops;
 mod tensor;
 
 pub use builder::{DenseBuilder, DenseBuildError};
+pub use ops::DenseOps;
 pub use tensor::DenseTensorImpl;
 
 #[cfg(test)]
@@ -10,7 +11,7 @@ mod tests {
     use execution::ExecutionTag;
     use op_contracts::FillOp;
 
-    use super::{DenseBuilder, DenseBuildError};
+    use super::{ops::DenseOps, DenseBuilder, DenseBuildError};
 
     #[test]
     fn build_then_fill() {
@@ -18,9 +19,10 @@ mod tests {
             .build()
             .expect("dense build should succeed");
 
-        tensor.fill_inplace(1.5).expect("fill should succeed");
+        DenseOps.fill_inplace(&mut tensor, 1.5).expect("fill should succeed");
 
         assert_eq!(tensor.shape(), &[2, 3]);
+        assert_eq!(tensor.strides(), &[3, 1]);
         assert_eq!(tensor.data(), vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5]);
         assert_eq!(tensor.execution_tag(), ExecutionTag::Cpu);
     }
@@ -42,7 +44,7 @@ mod tests {
             .build()
             .expect("dense build should succeed");
 
-        tensor.fill_inplace(9.5).expect("fill op should succeed");
+        DenseOps.fill_inplace(&mut tensor, 9.5).expect("fill op should succeed");
         assert_eq!(tensor.data(), vec![9.5, 9.5, 9.5, 9.5]);
     }
 
@@ -51,7 +53,8 @@ mod tests {
         let result = DenseBuilder::new(vec![usize::MAX, 2]).build();
         match result {
             Err(DenseBuildError::ShapeOverflow) => {}
-            other => panic!("expected ShapeOverflow, got: {other:?}"),
+            Err(_) => panic!("expected ShapeOverflow, got a different error"),
+            Ok(_) => panic!("expected ShapeOverflow, but build succeeded"),
         }
     }
 }

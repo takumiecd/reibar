@@ -5,5 +5,6 @@ edition = "2024"
 
 [dependencies]
 dense_impl = { path = "../../core/dense_impl" }
+execution = { path = "../../execution" }
 op_contracts = { path = "../../op_contracts" }
 tensor = { path = "../tensor" }

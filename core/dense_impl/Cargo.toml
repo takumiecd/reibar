@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+execution = { path = "../../execution" }
+op_contracts = { path = "../../op_contracts" }
+runtime = { path = "../../runtime" }
+schema = { path = "../../schema" }

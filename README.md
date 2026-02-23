@@ -12,3 +12,11 @@ The name is inspired by *reinforcing bar* ("rebar"), with the project-specific s
 ## Status
 
 Work in progress.
+
+## Layers
+
+- `api/`: user-facing API layer
+- `core/`: concrete tensor implementations
+- `execution/`: runtime abstraction layer (design notes first)
+- `execution_cpu/`: CPU backend components (storage/kernel/context/capability bundle)
+- `runtime/`: dispatcher and kernel registry orchestration

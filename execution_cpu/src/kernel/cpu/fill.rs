@@ -18,6 +18,7 @@ pub fn launch(
     _launch_config: &CpuKernelLaunchConfig,
 ) -> Result<(), CpuKernelLaunchError> {
     let out_key = output_key();
+    let view_key = view_spec_key();
 
     let out_storage = args
         .args()
@@ -41,13 +42,29 @@ pub fn launch(
                 value_key.tag().as_str()
             ))
         })?;
+    let view_spec = args
+        .args()
+        .require_as::<ViewSpec>(&view_key)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.fill requires view-spec param arg '{}': {err:?}",
+                view_key.tag().as_str()
+            ))
+        })?;
     let element_bytes = dtype.size_bytes();
-    let view_spec = parse_view_spec(args)?;
+    let numel = view_spec.checked_numel().map_err(|err| {
+        CpuKernelLaunchError::new(format!("cpu.fill view metadata is invalid: {err:?}"))
+    })?;
     out_storage
         .buffer()
         .with_write_bytes(|out| -> Result<(), CpuKernelLaunchError> {
-            for flat in 0..view_spec.numel {
-                let pos = flat_to_pos(flat, &view_spec.shape, &view_spec.strides, view_spec.offset)?;
+            for flat in 0..numel {
+                let pos = flat_to_pos(
+                    flat,
+                    view_spec.shape(),
+                    view_spec.strides(),
+                    view_spec.offset(),
+                )?;
                 let b = pos.checked_mul(element_bytes).ok_or_else(|| {
                     CpuKernelLaunchError::new(format!(
                         "cpu.fill view position {pos} overflows byte offset calculation"
@@ -70,42 +87,6 @@ pub fn launch(
         })?;
 
     Ok(())
-}
-
-#[derive(Debug, Clone)]
-struct FillViewSpec {
-    shape: Vec<usize>,
-    strides: Vec<usize>,
-    offset: usize,
-    numel: usize,
-}
-
-fn parse_view_spec(args: &CpuKernelArgs) -> Result<FillViewSpec, CpuKernelLaunchError> {
-    let view_key = view_spec_key();
-
-    let view_spec = args
-        .args()
-        .require_as::<ViewSpec>(&view_key)
-        .map_err(|err| {
-            CpuKernelLaunchError::new(format!(
-                "cpu.fill requires view-spec param arg '{}': {err:?}",
-                view_key.tag().as_str()
-            ))
-        })?;
-
-    let shape = view_spec.shape().to_vec();
-    let strides = view_spec.strides().to_vec();
-    let offset = view_spec.offset();
-    let numel = view_spec.checked_numel().map_err(|err| {
-        CpuKernelLaunchError::new(format!("cpu.fill view metadata is invalid: {err:?}"))
-    })?;
-
-    Ok(FillViewSpec {
-        shape,
-        strides,
-        offset,
-        numel,
-    })
 }
 
 fn flat_to_pos(

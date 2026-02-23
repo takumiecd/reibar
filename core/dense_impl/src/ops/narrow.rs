@@ -39,8 +39,16 @@ pub fn exec(
 
 #[derive(Debug)]
 pub enum DenseNarrowError {
-    DimOutOfBounds { dim: usize, ndim: usize },
-    RangeOutOfBounds { dim: usize, start: usize, len: usize, size: usize },
+    DimOutOfBounds {
+        dim: usize,
+        ndim: usize,
+    },
+    RangeOutOfBounds {
+        dim: usize,
+        start: usize,
+        len: usize,
+        size: usize,
+    },
 }
 
 impl op_contracts::NarrowOp<DenseTensorImpl> for super::DenseOps {

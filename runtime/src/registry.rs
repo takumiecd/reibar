@@ -66,7 +66,11 @@ impl KernelRegistry {
     }
 
     pub fn select(&mut self, key: &KernelKey) -> Option<KernelLauncher> {
-        if let Some(launcher) = self.cache.as_mut().and_then(|cache| cache.get(key).cloned()) {
+        if let Some(launcher) = self
+            .cache
+            .as_mut()
+            .and_then(|cache| cache.get(key).cloned())
+        {
             self.stats.cache_hits += 1;
             return Some(launcher);
         }

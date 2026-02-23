@@ -11,7 +11,12 @@ pub struct DenseTensorImpl {
 impl DenseTensorImpl {
     pub(crate) fn new(shape: Vec<usize>, storage: Storage) -> Self {
         let strides = contiguous_strides(&shape);
-        Self { shape, strides, offset: 0, storage }
+        Self {
+            shape,
+            strides,
+            offset: 0,
+            storage,
+        }
     }
 
     pub(crate) fn with_view(
@@ -20,7 +25,12 @@ impl DenseTensorImpl {
         offset: usize,
         storage: Storage,
     ) -> Self {
-        Self { shape, strides, offset, storage }
+        Self {
+            shape,
+            strides,
+            offset,
+            storage,
+        }
     }
 
     pub fn shape(&self) -> &[usize] {

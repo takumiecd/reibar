@@ -1,6 +1,8 @@
 use std::sync::{Mutex, OnceLock};
 
-use execution::{CpuKernelArgs, KernelArgs, Storage, StorageAllocError, StorageContext, StorageRequest};
+use execution::{
+    CpuKernelArgs, KernelArgs, Storage, StorageAllocError, StorageContext, StorageRequest,
+};
 use op_contracts::Scalar;
 use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
@@ -52,9 +54,9 @@ pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, 
         .dispatch_seed(seed, &args)
         .map_err(DenseAtError::Dispatch)?;
 
-    let value = out_cpu.buffer().with_read_bytes(|bytes| {
-        f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
-    });
+    let value = out_cpu
+        .buffer()
+        .with_read_bytes(|bytes| f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
 
     Ok(Scalar::F32(value))
 }
@@ -108,8 +110,15 @@ pub fn exec_write(
 
 #[derive(Debug)]
 pub enum DenseAtError {
-    RankMismatch { expected: usize, actual: usize },
-    IndexOutOfBounds { dim: usize, index: usize, size: usize },
+    RankMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    IndexOutOfBounds {
+        dim: usize,
+        index: usize,
+        size: usize,
+    },
     UnsupportedScalar(Scalar),
     StorageAlloc(StorageAllocError),
     KernelArgs(schema::KernelArgsError),
@@ -147,7 +156,11 @@ fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, D
     }
     for (dim, (&idx, &size)) in indices.iter().zip(shape.iter()).enumerate() {
         if idx >= size {
-            return Err(DenseAtError::IndexOutOfBounds { dim, index: idx, size });
+            return Err(DenseAtError::IndexOutOfBounds {
+                dim,
+                index: idx,
+                size,
+            });
         }
     }
     let pos = tensor.offset()

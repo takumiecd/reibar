@@ -12,10 +12,10 @@ pub trait BackendBundle {
     type StorageAllocError: Clone + PartialEq + Eq;
     type KernelMetadata: ExecutionKernelMetadata<Launcher = Self::KernelLauncher>;
     type KernelLauncher: ExecutionKernelLauncher<
-        Metadata = Self::KernelMetadata,
-        Args = Self::KernelArgs,
-        Error = Self::LaunchError,
-    >;
+            Metadata = Self::KernelMetadata,
+            Args = Self::KernelArgs,
+            Error = Self::LaunchError,
+        >;
     type KernelContext: ExecutionKernelContext + Default + PartialEq + Eq;
     type KernelArgs: ExecutionKernelArgs;
     type Capability: ExecutionCapability + Default + PartialEq + Eq;

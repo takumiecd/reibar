@@ -22,12 +22,15 @@ pub fn launch(
     let pos_key = pos_key();
     let value_key = value_key();
 
-    let out_storage = args.args().require_as::<StorageValue>(&out_key).map_err(|err| {
-        CpuKernelLaunchError::new(format!(
-            "cpu.write_at requires output storage arg '{}': {err:?}",
-            out_key.tag().as_str()
-        ))
-    })?;
+    let out_storage = args
+        .args()
+        .require_as::<StorageValue>(&out_key)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.write_at requires output storage arg '{}': {err:?}",
+                out_key.tag().as_str()
+            ))
+        })?;
 
     let pos = *args.args().require_as::<usize>(&pos_key).map_err(|err| {
         CpuKernelLaunchError::new(format!(

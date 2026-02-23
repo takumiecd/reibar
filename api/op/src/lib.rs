@@ -2,9 +2,9 @@ pub mod at;
 pub mod fill;
 pub mod narrow;
 
-pub use at::{at, set_at, AtError, SetAtError};
-pub use fill::{fill, fill_new, Fill, FillError};
-pub use narrow::{narrow, NarrowError};
+pub use at::{AtError, SetAtError, at, set_at};
+pub use fill::{Fill, FillError, fill, fill_new};
+pub use narrow::{NarrowError, narrow};
 pub use op_contracts::Scalar;
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CpuStorageContext {
     numa_node: usize,
 }
@@ -15,12 +15,6 @@ impl CpuStorageContext {
 
     pub fn numa_node(&self) -> usize {
         self.numa_node
-    }
-}
-
-impl Default for CpuStorageContext {
-    fn default() -> Self {
-        Self { numa_node: 0 }
     }
 }
 

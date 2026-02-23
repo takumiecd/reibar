@@ -22,19 +22,25 @@ pub fn launch(
     let out_key = output_key();
     let pos_key = pos_key();
 
-    let in_storage = args.args().require_as::<StorageValue>(&in_key).map_err(|err| {
-        CpuKernelLaunchError::new(format!(
-            "cpu.read_at requires input storage arg '{}': {err:?}",
-            in_key.tag().as_str()
-        ))
-    })?;
+    let in_storage = args
+        .args()
+        .require_as::<StorageValue>(&in_key)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.read_at requires input storage arg '{}': {err:?}",
+                in_key.tag().as_str()
+            ))
+        })?;
 
-    let out_storage = args.args().require_as::<StorageValue>(&out_key).map_err(|err| {
-        CpuKernelLaunchError::new(format!(
-            "cpu.read_at requires output storage arg '{}': {err:?}",
-            out_key.tag().as_str()
-        ))
-    })?;
+    let out_storage = args
+        .args()
+        .require_as::<StorageValue>(&out_key)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.read_at requires output storage arg '{}': {err:?}",
+                out_key.tag().as_str()
+            ))
+        })?;
 
     let pos = *args.args().require_as::<usize>(&pos_key).map_err(|err| {
         CpuKernelLaunchError::new(format!(
@@ -58,9 +64,9 @@ pub fn launch(
     }
 
     let b = pos * std::mem::size_of::<f32>();
-    let value_bytes = in_storage.buffer().with_read_bytes(|src| {
-        [src[b], src[b + 1], src[b + 2], src[b + 3]]
-    });
+    let value_bytes = in_storage
+        .buffer()
+        .with_read_bytes(|src| [src[b], src[b + 1], src[b + 2], src[b + 3]]);
 
     out_storage.buffer().with_write_bytes(|dst| {
         dst[0..4].copy_from_slice(&value_bytes);

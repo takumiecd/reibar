@@ -26,8 +26,12 @@ impl CpuRawBuffer {
             return Err(CpuStorageAllocError::InvalidAlignment { alignment });
         }
 
-        let layout = Layout::from_size_align(len, alignment)
-            .map_err(|_| CpuStorageAllocError::LayoutError { bytes: len, alignment })?;
+        let layout = Layout::from_size_align(len, alignment).map_err(|_| {
+            CpuStorageAllocError::LayoutError {
+                bytes: len,
+                alignment,
+            }
+        })?;
 
         if len == 0 {
             return Ok(Self {
@@ -136,32 +140,50 @@ impl CpuBuffer {
     }
 
     pub fn len_bytes(&self) -> usize {
-        let data = self.data.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let data = self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         data.len
     }
 
     pub fn alignment(&self) -> usize {
-        let data = self.data.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let data = self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         data.alignment
     }
 
     pub fn with_read_bytes<R>(&self, f: impl FnOnce(&[u8]) -> R) -> R {
-        let data = self.data.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let data = self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         f(data.as_slice())
     }
 
     pub fn with_write_bytes<R>(&self, f: impl FnOnce(&mut [u8]) -> R) -> R {
-        let mut data = self.data.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut data = self
+            .data
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         f(data.as_mut_slice())
     }
 
     pub fn with_read_ptr<R>(&self, f: impl FnOnce(*const u8, usize) -> R) -> R {
-        let data = self.data.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let data = self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         f(data.ptr.as_ptr(), data.len)
     }
 
     pub fn with_write_ptr<R>(&self, f: impl FnOnce(*mut u8, usize) -> R) -> R {
-        let data = self.data.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let data = self
+            .data
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         f(data.ptr.as_ptr(), data.len)
     }
 }
@@ -186,7 +208,7 @@ impl CpuStorage {
         dtype: DType,
     ) -> Result<Self, CpuStorageAllocError> {
         let dtype_size = dtype.size_bytes();
-        if bytes % dtype_size != 0 {
+        if !bytes.is_multiple_of(dtype_size) {
             return Err(CpuStorageAllocError::InvalidByteSizeForDType {
                 bytes,
                 dtype,

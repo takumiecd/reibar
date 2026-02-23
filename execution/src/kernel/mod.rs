@@ -103,7 +103,7 @@ mod tests {
         args: &CpuKernelArgs,
         _launch_config: &CpuKernelLaunchConfig,
     ) -> Result<(), CpuKernelLaunchError> {
-        if args.len() == 0 {
+        if args.is_empty() {
             return Ok(());
         }
         KERNEL_CALL_COUNT.fetch_add(1, Ordering::SeqCst);

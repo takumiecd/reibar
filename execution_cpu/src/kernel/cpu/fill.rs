@@ -181,20 +181,15 @@ fn decode_usize_buffer(
     buffer: &ScalarBuffer,
     arg_tag: &str,
 ) -> Result<Vec<usize>, CpuKernelLaunchError> {
-    if buffer.dtype() != DType::I64 {
-        return Err(CpuKernelLaunchError::new(format!(
-            "cpu.fill requires scalar-buffer arg '{}' to use i64 dtype, got {:?}",
-            arg_tag,
-            buffer.dtype()
-        )));
-    }
+    let raw = buffer.try_to_vec::<i64>().map_err(|err| {
+        CpuKernelLaunchError::new(format!(
+            "cpu.fill requires scalar-buffer arg '{}' to decode as i64 values: {err:?}",
+            arg_tag
+        ))
+    })?;
 
-    let mut chunks = buffer.bytes().chunks_exact(std::mem::size_of::<i64>());
-    let mut values = Vec::with_capacity(buffer.len());
-    for chunk in chunks.by_ref() {
-        let value = i64::from_ne_bytes([
-            chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
-        ]);
+    let mut values = Vec::with_capacity(raw.len());
+    for value in raw {
         if value < 0 {
             return Err(CpuKernelLaunchError::new(format!(
                 "cpu.fill requires scalar-buffer arg '{}' to contain non-negative i64 values",
@@ -207,12 +202,6 @@ fn decode_usize_buffer(
                 arg_tag
             ))
         })?);
-    }
-    if !chunks.remainder().is_empty() {
-        return Err(CpuKernelLaunchError::new(format!(
-            "cpu.fill scalar-buffer arg '{}' has invalid byte length",
-            arg_tag
-        )));
     }
 
     Ok(values)

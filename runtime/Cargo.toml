@@ -7,3 +7,4 @@ edition = "2024"
 execution = { path = "../execution" }
 execution_cpu = { path = "../execution_cpu" }
 schema = { path = "../schema" }
+lru = "0.12"

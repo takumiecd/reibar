@@ -1,6 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{collections::HashMap, num::NonZeroUsize};
 
 use execution::{KernelLauncher, KernelMetadata};
+use lru::LruCache;
 
 use crate::KernelKey;
 
@@ -31,10 +32,8 @@ pub struct KernelRegistryStats {
 pub struct KernelRegistry {
     config: KernelRegistryConfig,
     stats: KernelRegistryStats,
-    cache: HashMap<KernelKey, KernelLauncher>,
-    cache_lru: VecDeque<KernelKey>,
-    main_memory: HashMap<KernelKey, KernelLauncher>,
-    main_lru: VecDeque<KernelKey>,
+    cache: Option<LruCache<KernelKey, KernelLauncher>>,
+    main_memory: Option<LruCache<KernelKey, KernelLauncher>>,
     secondary_storage: HashMap<KernelKey, KernelMetadata>,
 }
 
@@ -43,10 +42,8 @@ impl KernelRegistry {
         Self {
             config,
             stats: KernelRegistryStats::default(),
-            cache: HashMap::new(),
-            cache_lru: VecDeque::new(),
-            main_memory: HashMap::new(),
-            main_lru: VecDeque::new(),
+            cache: NonZeroUsize::new(config.cache_capacity).map(LruCache::new),
+            main_memory: NonZeroUsize::new(config.main_memory_capacity).map(LruCache::new),
             secondary_storage: HashMap::new(),
         }
     }
@@ -60,21 +57,26 @@ impl KernelRegistry {
     }
 
     pub fn contains(&self, key: &KernelKey) -> bool {
-        self.cache.contains_key(key)
-            || self.main_memory.contains_key(key)
+        self.cache.as_ref().is_some_and(|cache| cache.contains(key))
+            || self
+                .main_memory
+                .as_ref()
+                .is_some_and(|main_memory| main_memory.contains(key))
             || self.secondary_storage.contains_key(key)
     }
 
     pub fn select(&mut self, key: &KernelKey) -> Option<KernelLauncher> {
-        if let Some(launcher) = self.cache.get(key).cloned() {
+        if let Some(launcher) = self.cache.as_mut().and_then(|cache| cache.get(key).cloned()) {
             self.stats.cache_hits += 1;
-            touch_lru(&mut self.cache_lru, *key);
             return Some(launcher);
         }
 
-        if let Some(launcher) = self.main_memory.get(key).cloned() {
+        if let Some(launcher) = self
+            .main_memory
+            .as_mut()
+            .and_then(|main_memory| main_memory.get(key).cloned())
+        {
             self.stats.main_memory_hits += 1;
-            touch_lru(&mut self.main_lru, *key);
             self.promote_to_cache(*key, launcher.clone());
             return Some(launcher);
         }
@@ -97,35 +99,29 @@ impl KernelRegistry {
 
     pub fn clear(&mut self) {
         self.stats = KernelRegistryStats::default();
-        self.cache.clear();
-        self.cache_lru.clear();
-        self.main_memory.clear();
-        self.main_lru.clear();
+        if let Some(cache) = self.cache.as_mut() {
+            cache.clear();
+        }
+        if let Some(main_memory) = self.main_memory.as_mut() {
+            main_memory.clear();
+        }
         self.secondary_storage.clear();
     }
 
     fn promote_to_cache(&mut self, key: KernelKey, launcher: KernelLauncher) {
-        if self.config.cache_capacity == 0 {
+        let Some(cache) = self.cache.as_mut() else {
+            return;
+        };
+
+        if cache.get(&key).is_some() {
             return;
         }
 
-        if self.cache.contains_key(&key) {
-            touch_lru(&mut self.cache_lru, key);
-            return;
+        if cache.len() >= self.config.cache_capacity {
+            let _ = cache.pop_lru();
         }
 
-        if self.cache.len() >= self.config.cache_capacity {
-            self.evict_cache();
-        }
-
-        self.cache.insert(key, launcher);
-        touch_lru(&mut self.cache_lru, key);
-    }
-
-    fn evict_cache(&mut self) {
-        if let Some(victim_key) = self.cache_lru.pop_back() {
-            self.cache.remove(&victim_key);
-        }
+        cache.put(key, launcher);
     }
 
     fn promote_to_main_memory(&mut self, key: KernelKey, launcher: KernelLauncher) {
@@ -134,47 +130,48 @@ impl KernelRegistry {
             return;
         }
 
-        if self.main_memory.contains_key(&key) {
-            touch_lru(&mut self.main_lru, key);
+        if self
+            .main_memory
+            .as_mut()
+            .and_then(|main_memory| main_memory.get(&key))
+            .is_some()
+        {
             return;
         }
 
-        if self.main_memory.len() >= self.config.main_memory_capacity {
+        if self
+            .main_memory
+            .as_ref()
+            .is_some_and(|main_memory| main_memory.len() >= self.config.main_memory_capacity)
+        {
             self.evict_main_memory();
         }
 
-        self.main_memory.insert(key, launcher);
-        touch_lru(&mut self.main_lru, key);
+        if let Some(main_memory) = self.main_memory.as_mut() {
+            main_memory.put(key, launcher);
+        }
     }
 
     fn evict_main_memory(&mut self) {
-        let Some(victim_key) = self.main_lru.pop_back() else {
+        let Some((victim_key, launcher)) = self
+            .main_memory
+            .as_mut()
+            .and_then(|main_memory| main_memory.pop_lru())
+        else {
             return;
         };
 
-        if let Some(launcher) = self.main_memory.remove(&victim_key) {
-            self.secondary_storage
-                .insert(victim_key, launcher.to_metadata());
-        }
+        self.secondary_storage
+            .insert(victim_key, launcher.to_metadata());
 
-        self.cache.remove(&victim_key);
-        remove_lru_key(&mut self.cache_lru, victim_key);
+        if let Some(cache) = self.cache.as_mut() {
+            let _ = cache.pop(&victim_key);
+        }
     }
 }
 
 impl Default for KernelRegistry {
     fn default() -> Self {
         Self::new(KernelRegistryConfig::default())
-    }
-}
-
-fn touch_lru(lru: &mut VecDeque<KernelKey>, key: KernelKey) {
-    remove_lru_key(lru, key);
-    lru.push_front(key);
-}
-
-fn remove_lru_key(lru: &mut VecDeque<KernelKey>, key: KernelKey) {
-    if let Some(pos) = lru.iter().position(|candidate| *candidate == key) {
-        let _ = lru.remove(pos);
     }
 }

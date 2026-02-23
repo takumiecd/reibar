@@ -112,8 +112,11 @@ mod tests {
     fn launch_reads_value_at_position() {
         let mut args = CpuKernelArgs::new();
         let input = CpuStorage::new(
-            CpuBuffer::new_with_alignment(encode_f32_slice(&[1.0, 2.5, 3.0]), DType::F32.alignment())
-                .expect("aligned buffer creation should succeed"),
+            CpuBuffer::new_with_alignment(
+                encode_f32_slice(&[1.0, 2.5, 3.0]),
+                DType::F32.alignment(),
+            )
+            .expect("aligned buffer creation should succeed"),
             DType::F32,
         )
         .expect("typed storage creation should succeed");

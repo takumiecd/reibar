@@ -60,14 +60,14 @@ impl DenseTensorImpl {
     /// True when the tensor occupies a contiguous, offset-0 region of its storage.
     /// The fill kernel requires this.
     pub fn is_packed(&self) -> bool {
-        self.offset == 0 && self.strides == contiguous_strides(&self.shape)
+        self.offset == 0 && has_contiguous_strides(&self.shape, &self.strides)
     }
 
     /// Read all elements in row-major order as `Vec<f32>`. Used by `impl Debug for Tensor`.
     pub fn read_all_f32(&self) -> Vec<f32> {
         let numel = self.numel();
         let mut result = Vec::with_capacity(numel);
-        let is_contiguous = self.strides == contiguous_strides(&self.shape);
+        let is_contiguous = has_contiguous_strides(&self.shape, &self.strides);
         match &self.storage {
             Storage::Cpu(storage) => {
                 storage.buffer().with_read_bytes(|bytes| {
@@ -113,6 +113,24 @@ pub(crate) fn flat_to_pos(flat: usize, shape: &[usize], strides: &[usize], offse
     pos
 }
 
+fn has_contiguous_strides(shape: &[usize], strides: &[usize]) -> bool {
+    if shape.len() != strides.len() {
+        return false;
+    }
+
+    let mut expected = 1usize;
+    for (&dim, &stride) in shape.iter().zip(strides).rev() {
+        if stride != expected {
+            return false;
+        }
+        expected = match expected.checked_mul(dim) {
+            Some(next) => next,
+            None => return false,
+        };
+    }
+    true
+}
+
 pub(crate) fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
     let n = shape.len();
     if n == 0 {
@@ -130,7 +148,7 @@ impl DenseTensorImpl {
     pub fn data(&self) -> Vec<f32> {
         let numel = self.numel();
         let mut result = Vec::with_capacity(numel);
-        let is_contiguous = self.strides == contiguous_strides(&self.shape);
+        let is_contiguous = has_contiguous_strides(&self.shape, &self.strides);
         match &self.storage {
             Storage::Cpu(storage) => {
                 storage.buffer().with_read_bytes(|bytes| {

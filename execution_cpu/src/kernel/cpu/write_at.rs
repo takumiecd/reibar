@@ -1,5 +1,6 @@
-use schema::{ArgKey, ArgKind, ArgRole, DType, StorageValue};
+use schema::{ArgKey, ArgKind, ArgRole, StorageValue};
 
+use super::value::require_encoded_value;
 use crate::{CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError};
 
 pub fn output_key() -> ArgKey {
@@ -8,10 +9,6 @@ pub fn output_key() -> ArgKey {
 
 pub fn pos_key() -> ArgKey {
     ArgKey::new(ArgRole::Param, "pos", ArgKind::Usize)
-}
-
-fn value_key(dtype: DType) -> ArgKey {
-    ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
 pub fn launch(
@@ -39,7 +36,7 @@ pub fn launch(
     })?;
 
     let dtype = out_storage.dtype();
-    let encoded = encoded_value(args, dtype)?;
+    let encoded = require_encoded_value(args, dtype, "cpu.write_at")?;
     let element_bytes = dtype.size_bytes();
     let b = pos.checked_mul(element_bytes).ok_or_else(|| {
         CpuKernelLaunchError::new(format!(
@@ -66,24 +63,12 @@ pub fn launch(
     Ok(())
 }
 
-fn encoded_value(args: &CpuKernelArgs, dtype: DType) -> Result<Vec<u8>, CpuKernelLaunchError> {
-    let value_key = value_key(dtype);
-    args.args()
-        .require_scalar_bytes(&value_key, dtype)
-        .map_err(|err| {
-            CpuKernelLaunchError::new(format!(
-                "cpu.write_at requires {:?} param arg '{}': {err:?}",
-                dtype,
-                value_key.tag().as_str()
-            ))
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use schema::{DType, KernelArg, Scalar};
 
-    use super::{launch, output_key, pos_key, value_key};
+    use super::super::value::value_key;
+    use super::{launch, output_key, pos_key};
     use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
 
     #[test]

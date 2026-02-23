@@ -1,7 +1,5 @@
-use schema::{ArgKey, ArgKind, ArgRole, StorageValue};
-
-use super::value::require_encoded_value;
 use crate::{CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError};
+use schema::{ArgKey, ArgKind, ArgRole, DType, StorageValue};
 
 pub fn output_key() -> ArgKey {
     ArgKey::new(ArgRole::Output, "out", ArgKind::Storage)
@@ -9,6 +7,10 @@ pub fn output_key() -> ArgKey {
 
 pub fn pos_key() -> ArgKey {
     ArgKey::new(ArgRole::Param, "pos", ArgKind::Usize)
+}
+
+fn value_key(dtype: DType) -> ArgKey {
+    ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
 pub fn launch(
@@ -36,7 +38,17 @@ pub fn launch(
     })?;
 
     let dtype = out_storage.dtype();
-    let encoded = require_encoded_value(args, dtype, "cpu.write_at")?;
+    let value_key = value_key(dtype);
+    let encoded = args
+        .args()
+        .require_encoded_scalar(&value_key, dtype)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.write_at requires {:?} param arg '{}': {err:?}",
+                dtype,
+                value_key.tag().as_str()
+            ))
+        })?;
     let element_bytes = dtype.size_bytes();
     let b = pos.checked_mul(element_bytes).ok_or_else(|| {
         CpuKernelLaunchError::new(format!(
@@ -67,8 +79,7 @@ pub fn launch(
 mod tests {
     use schema::{DType, KernelArg, Scalar};
 
-    use super::super::value::value_key;
-    use super::{launch, output_key, pos_key};
+    use super::{launch, output_key, pos_key, value_key};
     use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
 
     #[test]

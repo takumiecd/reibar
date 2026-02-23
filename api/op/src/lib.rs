@@ -1,18 +1,16 @@
 pub mod at;
 pub mod fill;
 pub mod narrow;
-pub mod to_host;
 
 pub use at::{at, set_at, AtError, SetAtError};
 pub use fill::{fill, fill_new, Fill, FillError};
 pub use narrow::{narrow, NarrowError};
-pub use to_host::{to_host, ToHostError};
 
 #[cfg(test)]
 mod tests {
     use tensor::TensorBuilder;
 
-    use super::{at, fill, fill_new, narrow, set_at, to_host};
+    use super::{at, fill, fill_new, narrow, set_at};
 
     fn dense_tensor(shape: Vec<usize>) -> tensor::Tensor {
         TensorBuilder::dense(shape)
@@ -39,9 +37,8 @@ mod tests {
     fn fill_new_does_not_mutate_original() {
         let tensor = dense_tensor(vec![2, 3]);
         let _filled = fill_new(&tensor, 9.0).expect("fill_new should succeed");
-        let host = to_host(&tensor).expect("to_host should succeed");
-        assert_eq!(at(&host, &[0, 0]).unwrap(), 0.0);
-        assert_eq!(at(&host, &[1, 2]).unwrap(), 0.0);
+        assert_eq!(at(&tensor, &[0, 0]).unwrap(), 0.0);
+        assert_eq!(at(&tensor, &[1, 2]).unwrap(), 0.0);
     }
 
     #[test]
@@ -51,33 +48,25 @@ mod tests {
         fill(&mut tensor, 2.0).expect("second fill should succeed");
     }
 
-    // --- to_host ---
+    // --- fill + at ---
 
     #[test]
-    fn to_host_on_cpu_tensor_succeeds() {
-        let tensor = dense_tensor(vec![2]);
-        assert!(to_host(&tensor).is_ok());
-    }
-
-    #[test]
-    fn fill_then_to_host_readable_via_at() {
+    fn fill_then_readable_via_at() {
         let mut tensor = dense_tensor(vec![2, 3]);
         fill(&mut tensor, 1.5).expect("fill should succeed");
-        let host = to_host(&tensor).expect("to_host should succeed");
         for i in 0..2 {
             for j in 0..3 {
-                assert_eq!(at(&host, &[i, j]).unwrap(), 1.5);
+                assert_eq!(at(&tensor, &[i, j]).unwrap(), 1.5);
             }
         }
     }
 
     #[test]
-    fn fill_new_then_to_host_readable_via_at() {
+    fn fill_new_then_readable_via_at() {
         let tensor = dense_tensor(vec![3]);
         let filled = fill_new(&tensor, 7.0).expect("fill_new should succeed");
-        let host = to_host(&filled).expect("to_host should succeed");
         for i in 0..3 {
-            assert_eq!(at(&host, &[i]).unwrap(), 7.0);
+            assert_eq!(at(&filled, &[i]).unwrap(), 7.0);
         }
     }
 
@@ -124,9 +113,8 @@ mod tests {
             set_at(&mut tensor, &[i], i as f32).expect("set_at should succeed");
         }
         let view = narrow(&tensor, 0, 1, 2).expect("narrow should succeed");
-        let host = to_host(&view).expect("to_host on view should succeed");
-        assert_eq!(at(&host, &[0]).unwrap(), 1.0);
-        assert_eq!(at(&host, &[1]).unwrap(), 2.0);
+        assert_eq!(at(&view, &[0]).unwrap(), 1.0);
+        assert_eq!(at(&view, &[1]).unwrap(), 2.0);
     }
 
     #[test]

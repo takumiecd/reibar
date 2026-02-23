@@ -52,6 +52,29 @@ impl DenseTensorImpl {
     pub fn is_packed(&self) -> bool {
         self.offset == 0 && self.strides == contiguous_strides(&self.shape)
     }
+
+    /// Read all elements in row-major order as `Vec<f32>`. Used by `impl Debug for Tensor`.
+    pub fn read_all_f32(&self) -> Vec<f32> {
+        let numel = self.numel();
+        let mut result = Vec::with_capacity(numel);
+        match &self.storage {
+            Storage::Cpu(storage) => {
+                storage.buffer().with_read_bytes(|bytes| {
+                    for i in 0..numel {
+                        let pos = flat_to_pos(i, &self.shape, &self.strides, self.offset);
+                        let b = pos * 4;
+                        result.push(f32::from_ne_bytes([
+                            bytes[b],
+                            bytes[b + 1],
+                            bytes[b + 2],
+                            bytes[b + 3],
+                        ]));
+                    }
+                });
+            }
+        }
+        result
+    }
 }
 
 /// Flat row-major index → storage element position accounting for strides and offset.

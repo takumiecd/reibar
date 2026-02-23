@@ -1,6 +1,5 @@
 use std::fmt;
 
-use dense_impl::ops::to_host;
 use dense_impl::DenseTensorImpl;
 use execution::ExecutionTag;
 
@@ -29,7 +28,7 @@ impl fmt::Debug for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Dense(dense) if dense.execution_tag() == ExecutionTag::Cpu => {
-                let data = to_host::exec_f32(dense).unwrap_or_default();
+                let data = dense.read_all_f32();
                 f.debug_struct("Tensor")
                     .field("shape", &dense.shape())
                     .field("data", &data)

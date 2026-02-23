@@ -56,7 +56,7 @@ pub fn launch(
                 dst.len()
             )));
         };
-        slot.copy_from_slice(&encoded);
+        slot.copy_from_slice(encoded.as_slice());
         Ok(())
     })?;
 

@@ -53,7 +53,7 @@ Kernel argument layer.
 
 - `insert_scalar`
 - `require_scalar`
-- `require_scalar_bytes`
+- `require_encoded_scalar`
 - `insert_scalar_buffer`
 - `require_scalar_buffer`
 
@@ -94,7 +94,7 @@ Avoid a 2-kind model (`Storage` + `Scalar`) unless index semantics are encoded s
 1. API receives value (`impl Into<Scalar>`).
 2. Tensor op checks `tensor.dtype()` and `value.dtype()` compatibility.
 3. Use `KernelArgs::insert_scalar` for scalar params.
-4. Kernel side uses `require_scalar` or `require_scalar_bytes`.
+4. Kernel side uses `require_scalar` or `require_encoded_scalar`.
 5. For byte conversion, always delegate to `DType::{encode_scalar, decode_scalar}`.
 
 ## Adding New Scalar Type Checklist

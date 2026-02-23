@@ -38,7 +38,7 @@ pub fn launch(
             }
 
             for chunk in out.chunks_exact_mut(element_bytes) {
-                chunk.copy_from_slice(&pattern);
+                chunk.copy_from_slice(pattern.as_slice());
             }
             Ok(())
         })?;

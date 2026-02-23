@@ -1,4 +1,4 @@
-use crate::{ArgKind, Scalar};
+use crate::{ArgKind, EncodedScalar, Scalar};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DType {
@@ -31,12 +31,12 @@ impl DType {
         ArgKind::Scalar(self)
     }
 
-    pub fn encode_scalar(self, value: &Scalar) -> Option<Vec<u8>> {
+    pub fn encode_scalar(self, value: &Scalar) -> Option<EncodedScalar> {
         match (self, value) {
-            (Self::F32, Scalar::F32(v)) => Some(v.to_ne_bytes().to_vec()),
-            (Self::I64, Scalar::I64(v)) => Some(v.to_ne_bytes().to_vec()),
-            (Self::U8, Scalar::U8(v)) => Some(vec![*v]),
-            (Self::Bool, Scalar::Bool(v)) => Some(vec![u8::from(*v)]),
+            (Self::F32, Scalar::F32(v)) => Some(EncodedScalar::from_array(v.to_ne_bytes())),
+            (Self::I64, Scalar::I64(v)) => Some(EncodedScalar::from_array(v.to_ne_bytes())),
+            (Self::U8, Scalar::U8(v)) => Some(EncodedScalar::from_byte(*v)),
+            (Self::Bool, Scalar::Bool(v)) => Some(EncodedScalar::from_byte(u8::from(*v))),
             _ => None,
         }
     }

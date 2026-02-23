@@ -5,7 +5,7 @@ use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar};
+use schema::{ArgKey, ArgKind, ArgRole, DType, EncodedScalar, KernelArg, Scalar};
 
 use crate::{DenseTensorImpl, tensor::flat_to_pos};
 
@@ -76,7 +76,7 @@ fn fill_view_cpu(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), DenseFil
                     buffer_len: dst.len(),
                 });
             };
-            slot.copy_from_slice(&pattern);
+            slot.copy_from_slice(pattern.as_slice());
         }
         Ok(())
     })
@@ -147,9 +147,9 @@ fn insert_fill_value_arg(
         .map_err(DenseFillError::KernelArgs)
 }
 
-fn scalar_pattern(dtype: DType, value: Scalar) -> Result<Vec<u8>, DenseFillError> {
-    if let Some(bytes) = dtype.encode_scalar(&value) {
-        Ok(bytes)
+fn scalar_pattern(dtype: DType, value: Scalar) -> Result<EncodedScalar, DenseFillError> {
+    if let Some(encoded) = dtype.encode_scalar(&value) {
+        Ok(encoded)
     } else {
         Err(DenseFillError::ScalarDTypeMismatch {
             tensor_dtype: dtype,

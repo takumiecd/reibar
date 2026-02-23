@@ -1,4 +1,4 @@
-use schema::{ArgKey, ArgRole, DType};
+use schema::{ArgKey, ArgRole, DType, EncodedScalar};
 
 use crate::{CpuKernelArgs, CpuKernelLaunchError};
 
@@ -10,10 +10,10 @@ pub(super) fn require_encoded_value(
     args: &CpuKernelArgs,
     dtype: DType,
     op_name: &str,
-) -> Result<Vec<u8>, CpuKernelLaunchError> {
+) -> Result<EncodedScalar, CpuKernelLaunchError> {
     let key = value_key(dtype);
     args.args()
-        .require_scalar_bytes(&key, dtype)
+        .require_encoded_scalar(&key, dtype)
         .map_err(|err| {
             CpuKernelLaunchError::new(format!(
                 "{op_name} requires {:?} param arg '{}': {err:?}",

@@ -18,7 +18,7 @@
 - `KernelArgs` provides typed helpers:
   - `insert_scalar`
   - `require_scalar`
-  - `require_scalar_bytes`
+  - `require_encoded_scalar`
   - `insert_scalar_buffer`
   - `require_scalar_buffer`
 

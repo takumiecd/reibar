@@ -1,4 +1,6 @@
-use crate::{ArgKey, ArgValueAccess, DType, KernelArg, KernelArgsError, Scalar, ScalarBuffer};
+use crate::{
+    ArgKey, ArgValueAccess, DType, EncodedScalar, KernelArg, KernelArgsError, Scalar, ScalarBuffer,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KernelArgs<S> {
@@ -84,14 +86,14 @@ impl<S> KernelArgs<S> {
         }
     }
 
-    pub fn require_scalar_bytes(
+    pub fn require_encoded_scalar(
         &self,
         key: &ArgKey,
         dtype: DType,
-    ) -> Result<Vec<u8>, KernelArgsError> {
+    ) -> Result<EncodedScalar, KernelArgsError> {
         let value = self.require_scalar(key, dtype)?;
         match dtype.encode_scalar(&value) {
-            Some(bytes) => Ok(bytes),
+            Some(encoded) => Ok(encoded),
             None => Err(KernelArgsError::TypeMismatch {
                 key: key.clone(),
                 expected: dtype.value_arg_kind(),

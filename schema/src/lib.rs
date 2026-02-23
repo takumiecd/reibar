@@ -1,6 +1,7 @@
 mod arg;
 mod args;
 mod dtype;
+mod encoded_scalar;
 mod error;
 mod key;
 mod role;
@@ -11,6 +12,7 @@ mod value;
 pub use arg::KernelArg;
 pub use args::KernelArgs;
 pub use dtype::DType;
+pub use encoded_scalar::EncodedScalar;
 pub use error::KernelArgsError;
 pub use key::{ArgKey, ArgTag};
 pub use role::ArgRole;
@@ -107,17 +109,17 @@ mod tests {
     }
 
     #[test]
-    fn kernel_args_require_scalar_bytes() {
+    fn kernel_args_require_encoded_scalar() {
         let mut args: KernelArgs<()> = KernelArgs::new();
         let key = ArgKey::new(ArgRole::Param, "value", ArgKind::Scalar(DType::F32));
 
         args.insert_scalar(key.clone(), Scalar::F32(3.5))
             .expect("scalar insertion should succeed");
 
-        let bytes = args
-            .require_scalar_bytes(&key, DType::F32)
-            .expect("scalar bytes retrieval should succeed");
-        assert_eq!(bytes, 3.5f32.to_ne_bytes().to_vec());
+        let encoded = args
+            .require_encoded_scalar(&key, DType::F32)
+            .expect("scalar encoding retrieval should succeed");
+        assert_eq!(encoded.as_slice(), 3.5f32.to_ne_bytes().as_slice());
     }
 
     #[test]
@@ -195,7 +197,7 @@ mod tests {
                 .encode_scalar(&value)
                 .expect("scalar encoding should succeed");
             let decoded = dtype
-                .decode_scalar(&encoded)
+                .decode_scalar(encoded.as_slice())
                 .expect("scalar decoding should succeed");
             assert_eq!(decoded, value);
         }

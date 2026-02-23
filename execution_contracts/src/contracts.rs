@@ -39,6 +39,16 @@ pub trait ExecutionKernelMetadata: Clone + Send + Sync + 'static {
     fn into_launcher(self) -> Self::Launcher;
 }
 
+/// A launch handle for a backend kernel implementation.
+///
+/// # Clone contract
+///
+/// `Clone::clone` SHOULD be cheap. Backends that manage expensive runtime
+/// objects (for example, compiled device functions or pipeline handles)
+/// SHOULD implement clone as a shared-handle copy (Arc-like), not a deep copy.
+///
+/// `to_metadata` SHOULD produce a compact descriptor suitable for caching.
+/// Heavy runtime objects should remain owned by the launcher side.
 pub trait ExecutionKernelLauncher: Clone + Send + Sync + 'static {
     type Metadata;
     type Args;
@@ -47,4 +57,3 @@ pub trait ExecutionKernelLauncher: Clone + Send + Sync + 'static {
     fn to_metadata(&self) -> Self::Metadata;
     fn launch(&self, args: &Self::Args) -> Result<(), Self::Error>;
 }
-

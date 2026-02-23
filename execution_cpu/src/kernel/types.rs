@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use schema::{KernelArg, KernelArgs, KernelArgsError};
 
 use crate::storage::CpuStorage;
@@ -171,30 +173,36 @@ impl CpuKernelMetadata {
 
 #[derive(Debug, Clone)]
 pub struct CpuKernelLauncher {
+    inner: Arc<CpuKernelLauncherInner>,
+}
+
+#[derive(Debug, Clone)]
+struct CpuKernelLauncherInner {
     launch_config: CpuKernelLaunchConfig,
     kernel_fn: CpuKernelFn,
 }
 
 impl CpuKernelLauncher {
     pub fn kernel_name(&self) -> &str {
-        self.launch_config.kernel_name()
+        self.inner.launch_config.kernel_name()
     }
 
     pub fn launch_config(&self) -> &CpuKernelLaunchConfig {
-        &self.launch_config
+        &self.inner.launch_config
     }
 
     pub fn entrypoint(&self) -> &CpuKernelEntrypoint {
-        self.launch_config.entrypoint()
+        self.inner.launch_config.entrypoint()
     }
 
     pub fn with_entrypoint(mut self, entrypoint: CpuKernelEntrypoint) -> Self {
-        self.launch_config = self.launch_config.with_entrypoint(entrypoint);
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.launch_config = inner.launch_config.clone().with_entrypoint(entrypoint);
         self
     }
 
     pub fn kernel_fn(&self) -> CpuKernelFn {
-        self.kernel_fn
+        self.inner.kernel_fn
     }
 
     pub fn to_metadata(&self) -> CpuKernelMetadata {
@@ -215,8 +223,10 @@ impl execution_contracts::ExecutionKernelMetadata for CpuKernelMetadata {
 
     fn into_launcher(self) -> Self::Launcher {
         CpuKernelLauncher {
-            launch_config: CpuKernelLaunchConfig::new(self.kernel_name),
-            kernel_fn: self.kernel_fn,
+            inner: Arc::new(CpuKernelLauncherInner {
+                launch_config: CpuKernelLaunchConfig::new(self.kernel_name),
+                kernel_fn: self.kernel_fn,
+            }),
         }
     }
 }
@@ -228,12 +238,49 @@ impl execution_contracts::ExecutionKernelLauncher for CpuKernelLauncher {
 
     fn to_metadata(&self) -> Self::Metadata {
         CpuKernelMetadata {
-            kernel_name: self.launch_config.kernel_name.clone(),
-            kernel_fn: self.kernel_fn,
+            kernel_name: self.inner.launch_config.kernel_name.clone(),
+            kernel_fn: self.inner.kernel_fn,
         }
     }
 
     fn launch(&self, args: &Self::Args) -> Result<(), Self::Error> {
-        (self.kernel_fn)(args, &self.launch_config)
+        (self.inner.kernel_fn)(args, &self.inner.launch_config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::{CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError, CpuKernelMetadata};
+
+    fn test_kernel(
+        _args: &CpuKernelArgs,
+        _launch_config: &CpuKernelLaunchConfig,
+    ) -> Result<(), CpuKernelLaunchError> {
+        Ok(())
+    }
+
+    #[test]
+    fn launcher_clone_is_shallow_shared_handle() {
+        let launcher = CpuKernelMetadata::new("fill_f32", test_kernel).into_launcher();
+        let cloned = launcher.clone();
+        assert!(Arc::ptr_eq(&launcher.inner, &cloned.inner));
+    }
+
+    #[test]
+    fn with_entrypoint_detaches_from_shared_state() {
+        let launcher = CpuKernelMetadata::new("fill_f32", test_kernel).into_launcher();
+        let cloned = launcher.clone();
+        let updated = cloned.with_entrypoint(
+            super::CpuKernelEntrypoint::new().with_device_function("fill_f32_device"),
+        );
+
+        assert_eq!(launcher.entrypoint().device_function(), None);
+        assert_eq!(
+            updated.entrypoint().device_function(),
+            Some("fill_f32_device")
+        );
+        assert!(!Arc::ptr_eq(&launcher.inner, &updated.inner));
     }
 }

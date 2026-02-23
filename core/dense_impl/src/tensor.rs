@@ -1,5 +1,5 @@
 use execution::{ExecutionTag, Storage};
-use schema::{DType, Scalar};
+use schema::{DType, Scalar, ViewSpec, ViewSpecError};
 
 #[derive(Clone)]
 pub struct DenseTensorImpl {
@@ -44,6 +44,10 @@ impl DenseTensorImpl {
 
     pub fn offset(&self) -> usize {
         self.offset
+    }
+
+    pub fn view_spec(&self) -> Result<ViewSpec, ViewSpecError> {
+        ViewSpec::new(self.shape.clone(), self.strides.clone(), self.offset)
     }
 
     pub fn storage(&self) -> &Storage {

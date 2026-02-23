@@ -7,14 +7,17 @@ use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar};
+use schema::{
+    ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, ScalarBuffer, ViewSpecError,
+};
 
 use crate::DenseTensorImpl;
 
 /// Read a single element at the given multi-dimensional index.
 pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, DenseAtError> {
-    let pos = validated_pos(tensor, indices)?;
     let dtype = tensor.dtype();
+    let view_spec = tensor.view_spec().map_err(DenseAtError::InvalidViewSpec)?;
+    let encoded_indices = encode_indices(indices)?;
 
     let context = StorageContext::from_execution_tag(tensor.execution_tag());
     let out = Storage::allocate(
@@ -36,7 +39,10 @@ pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, 
         .insert(KernelArg::storage(read_output_key(), out_cpu.clone()))
         .map_err(DenseAtError::KernelArgs)?;
     cpu_args
-        .insert(KernelArg::usize(pos_key(), pos))
+        .insert(KernelArg::view_spec(view_spec_key(), view_spec))
+        .map_err(DenseAtError::KernelArgs)?;
+    cpu_args
+        .insert(KernelArg::scalar_buffer(indices_key(), encoded_indices))
         .map_err(DenseAtError::KernelArgs)?;
     let args = KernelArgs::Cpu(cpu_args);
 
@@ -68,8 +74,9 @@ pub fn exec_write(
     indices: &[usize],
     value: Scalar,
 ) -> Result<(), DenseAtError> {
-    let pos = validated_pos(tensor, indices)?;
     let dtype = tensor.dtype();
+    let view_spec = tensor.view_spec().map_err(DenseAtError::InvalidViewSpec)?;
+    let encoded_indices = encode_indices(indices)?;
 
     let out_cpu = match tensor.storage() {
         Storage::Cpu(storage) => storage.clone(),
@@ -80,7 +87,10 @@ pub fn exec_write(
         .insert(KernelArg::storage(write_output_key(), out_cpu))
         .map_err(DenseAtError::KernelArgs)?;
     cpu_args
-        .insert(KernelArg::usize(pos_key(), pos))
+        .insert(KernelArg::view_spec(view_spec_key(), view_spec))
+        .map_err(DenseAtError::KernelArgs)?;
+    cpu_args
+        .insert(KernelArg::scalar_buffer(indices_key(), encoded_indices))
         .map_err(DenseAtError::KernelArgs)?;
     insert_write_value_arg(&mut cpu_args, dtype, value)?;
     let args = KernelArgs::Cpu(cpu_args);
@@ -104,19 +114,9 @@ pub fn exec_write(
 
 #[derive(Debug)]
 pub enum DenseAtError {
-    RankMismatch {
-        expected: usize,
-        actual: usize,
-    },
-    IndexOutOfBounds {
-        dim: usize,
-        index: usize,
-        size: usize,
-    },
-    ScalarDTypeMismatch {
-        tensor_dtype: DType,
-        value: Scalar,
-    },
+    ScalarDTypeMismatch { tensor_dtype: DType, value: Scalar },
+    InvalidViewSpec(ViewSpecError),
+    IndicesEncodingOverflow,
     StorageAlloc(StorageAllocError),
     KernelArgs(schema::KernelArgsError),
     DispatcherPoisoned,
@@ -135,38 +135,16 @@ fn write_output_key() -> ArgKey {
     ArgKey::new(ArgRole::Output, "out", ArgKind::Storage)
 }
 
-fn pos_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "pos", ArgKind::Usize)
+fn view_spec_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "view_spec", ArgKind::ViewSpec)
+}
+
+fn indices_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "indices", ArgKind::ScalarBuffer)
 }
 
 fn write_value_key(dtype: DType) -> ArgKey {
     ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
-}
-
-fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, DenseAtError> {
-    let shape = tensor.shape();
-    if indices.len() != shape.len() {
-        return Err(DenseAtError::RankMismatch {
-            expected: shape.len(),
-            actual: indices.len(),
-        });
-    }
-    for (dim, (&idx, &size)) in indices.iter().zip(shape.iter()).enumerate() {
-        if idx >= size {
-            return Err(DenseAtError::IndexOutOfBounds {
-                dim,
-                index: idx,
-                size,
-            });
-        }
-    }
-    let pos = tensor.offset()
-        + indices
-            .iter()
-            .zip(tensor.strides().iter())
-            .map(|(i, s)| i * s)
-            .sum::<usize>();
-    Ok(pos)
 }
 
 fn scalar_from_element_bytes(dtype: DType, bytes: &[u8]) -> Scalar {
@@ -191,6 +169,20 @@ fn insert_write_value_arg(
         .args_mut()
         .insert_scalar(write_value_key(dtype), value)
         .map_err(DenseAtError::KernelArgs)
+}
+
+fn encode_indices(indices: &[usize]) -> Result<ScalarBuffer, DenseAtError> {
+    let mut bytes = Vec::with_capacity(
+        indices
+            .len()
+            .checked_mul(std::mem::size_of::<i64>())
+            .ok_or(DenseAtError::IndicesEncodingOverflow)?,
+    );
+    for &index in indices {
+        let index = i64::try_from(index).map_err(|_| DenseAtError::IndicesEncodingOverflow)?;
+        bytes.extend_from_slice(&index.to_ne_bytes());
+    }
+    ScalarBuffer::new(DType::I64, indices.len(), bytes).ok_or(DenseAtError::IndicesEncodingOverflow)
 }
 
 fn dense_dispatcher() -> &'static Mutex<Dispatcher> {

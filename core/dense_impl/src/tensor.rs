@@ -63,7 +63,6 @@ impl DenseTensorImpl {
     }
 
     /// True when the tensor occupies a contiguous, offset-0 region of its storage.
-    /// The fill kernel requires this.
     pub fn is_packed(&self) -> bool {
         self.offset == 0 && has_contiguous_strides(&self.shape, &self.strides)
     }

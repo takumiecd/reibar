@@ -1,6 +1,5 @@
 use execution::{ExecutionTag, Storage};
-use op_contracts::Scalar;
-use schema::DType;
+use schema::{DType, Scalar};
 
 #[derive(Clone)]
 pub struct DenseTensorImpl {

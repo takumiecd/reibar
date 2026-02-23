@@ -3,12 +3,11 @@ use std::sync::{Mutex, OnceLock};
 use execution::{
     CpuKernelArgs, KernelArgs, Storage, StorageAllocError, StorageContext, StorageRequest,
 };
-use op_contracts::Scalar;
 use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar};
 
 use crate::DenseTensorImpl;
 
@@ -141,7 +140,7 @@ fn pos_key() -> ArgKey {
 }
 
 fn write_value_key(dtype: DType) -> ArgKey {
-    ArgKey::new(ArgRole::Param, "value", scalar_arg_kind(dtype))
+    ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
 fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, DenseAtError> {
@@ -168,15 +167,6 @@ fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, D
             .map(|(i, s)| i * s)
             .sum::<usize>();
     Ok(pos)
-}
-
-fn scalar_arg_kind(dtype: DType) -> ArgKind {
-    match dtype {
-        DType::F32 => ArgKind::F32,
-        DType::I64 => ArgKind::I64,
-        DType::U8 => ArgKind::U8,
-        DType::Bool => ArgKind::Bool,
-    }
 }
 
 fn scalar_from_element_bytes(dtype: DType, bytes: &[u8]) -> Scalar {

@@ -1,3 +1,5 @@
+use crate::ArgKind;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DType {
     F32,
@@ -22,6 +24,15 @@ impl DType {
             Self::I64 => std::mem::align_of::<i64>(),
             Self::U8 => std::mem::align_of::<u8>(),
             Self::Bool => std::mem::align_of::<bool>(),
+        }
+    }
+
+    pub fn value_arg_kind(self) -> ArgKind {
+        match self {
+            Self::F32 => ArgKind::F32,
+            Self::I64 => ArgKind::I64,
+            Self::U8 => ArgKind::U8,
+            Self::Bool => ArgKind::Bool,
         }
     }
 }

@@ -11,7 +11,7 @@ pub fn pos_key() -> ArgKey {
 }
 
 fn value_key(dtype: DType) -> ArgKey {
-    ArgKey::new(ArgRole::Param, "value", value_arg_kind(dtype))
+    ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
 pub fn launch(
@@ -64,15 +64,6 @@ pub fn launch(
     })?;
 
     Ok(())
-}
-
-fn value_arg_kind(dtype: DType) -> ArgKind {
-    match dtype {
-        DType::F32 => ArgKind::F32,
-        DType::I64 => ArgKind::I64,
-        DType::U8 => ArgKind::U8,
-        DType::Bool => ArgKind::Bool,
-    }
 }
 
 fn encoded_value(args: &CpuKernelArgs, dtype: DType) -> Result<Vec<u8>, CpuKernelLaunchError> {

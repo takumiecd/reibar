@@ -1,12 +1,11 @@
 use std::sync::{Mutex, OnceLock};
 
 use execution::{CpuKernelArgs, KernelArgs, Storage};
-use op_contracts::Scalar;
 use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar};
 
 use crate::{DenseTensorImpl, tensor::flat_to_pos};
 
@@ -109,7 +108,7 @@ fn output_key() -> ArgKey {
 }
 
 fn value_key(dtype: DType) -> ArgKey {
-    ArgKey::new(ArgRole::Param, "value", scalar_arg_kind(dtype))
+    ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
 fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
@@ -127,15 +126,6 @@ impl op_contracts::FillOp<DenseTensorImpl> for super::DenseOps {
     type Error = DenseFillError;
     fn fill_inplace(&self, tensor: &mut DenseTensorImpl, value: Scalar) -> Result<(), Self::Error> {
         exec(tensor, value)
-    }
-}
-
-fn scalar_arg_kind(dtype: DType) -> ArgKind {
-    match dtype {
-        DType::F32 => ArgKind::F32,
-        DType::I64 => ArgKind::I64,
-        DType::U8 => ArgKind::U8,
-        DType::Bool => ArgKind::Bool,
     }
 }
 

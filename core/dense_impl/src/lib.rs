@@ -9,7 +9,8 @@ pub use tensor::DenseTensorImpl;
 #[cfg(test)]
 mod tests {
     use execution::ExecutionTag;
-    use op_contracts::{FillOp, Scalar};
+    use op_contracts::FillOp;
+    use schema::Scalar;
 
     use super::{DenseBuildError, DenseBuilder, ops::DenseOps};
 

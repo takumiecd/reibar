@@ -1,9 +1,22 @@
+use crate::DType;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Scalar {
     F32(f32),
     I64(i64),
     U8(u8),
     Bool(bool),
+}
+
+impl Scalar {
+    pub fn dtype(&self) -> DType {
+        match self {
+            Self::F32(_) => DType::F32,
+            Self::I64(_) => DType::I64,
+            Self::U8(_) => DType::U8,
+            Self::Bool(_) => DType::Bool,
+        }
+    }
 }
 
 impl From<f32> for Scalar {

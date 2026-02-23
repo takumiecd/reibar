@@ -4,6 +4,7 @@ mod dtype;
 mod error;
 mod key;
 mod role;
+mod scalar;
 mod value;
 
 pub use arg::KernelArg;
@@ -12,6 +13,7 @@ pub use dtype::DType;
 pub use error::KernelArgsError;
 pub use key::{ArgKey, ArgTag};
 pub use role::ArgRole;
+pub use scalar::Scalar;
 pub use value::{ArgKind, ArgValue, ArgValueAccess, StorageValue};
 
 #[cfg(test)]

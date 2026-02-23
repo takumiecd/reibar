@@ -1,4 +1,4 @@
-use crate::DType;
+use crate::{ArgKind, DType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Scalar {
@@ -16,6 +16,10 @@ impl Scalar {
             Self::U8(_) => DType::U8,
             Self::Bool(_) => DType::Bool,
         }
+    }
+
+    pub fn arg_kind(&self) -> ArgKind {
+        self.dtype().value_arg_kind()
     }
 }
 

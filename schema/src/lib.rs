@@ -18,7 +18,10 @@ pub use value::{ArgKind, ArgValue, ArgValueAccess, StorageValue};
 
 #[cfg(test)]
 mod tests {
-    use super::{ArgKey, ArgKind, ArgRole, KernelArg, KernelArgs, KernelArgsError, StorageValue};
+    use super::{
+        ArgKey, ArgKind, ArgRole, DType, KernelArg, KernelArgs, KernelArgsError, Scalar,
+        StorageValue,
+    };
 
     #[test]
     fn kernel_args_insert_and_require() {
@@ -85,5 +88,53 @@ mod tests {
                 actual: ArgKind::I64,
             })
         );
+    }
+
+    #[test]
+    fn kernel_args_insert_and_require_scalar() {
+        let mut args: KernelArgs<()> = KernelArgs::new();
+        let key = ArgKey::new(ArgRole::Param, "value", ArgKind::I64);
+
+        args.insert_scalar(key.clone(), Scalar::I64(42))
+            .expect("scalar insertion should succeed");
+
+        let value = args
+            .require_scalar(&key, DType::I64)
+            .expect("scalar retrieval should succeed");
+        assert_eq!(value, Scalar::I64(42));
+    }
+
+    #[test]
+    fn kernel_args_require_scalar_bytes() {
+        let mut args: KernelArgs<()> = KernelArgs::new();
+        let key = ArgKey::new(ArgRole::Param, "value", ArgKind::F32);
+
+        args.insert_scalar(key.clone(), Scalar::F32(3.5))
+            .expect("scalar insertion should succeed");
+
+        let bytes = args
+            .require_scalar_bytes(&key, DType::F32)
+            .expect("scalar bytes retrieval should succeed");
+        assert_eq!(bytes, 3.5f32.to_ne_bytes().to_vec());
+    }
+
+    #[test]
+    fn dtype_encode_decode_scalar_roundtrip() {
+        let values = [
+            (DType::F32, Scalar::F32(1.25)),
+            (DType::I64, Scalar::I64(-3)),
+            (DType::U8, Scalar::U8(7)),
+            (DType::Bool, Scalar::Bool(true)),
+        ];
+
+        for (dtype, value) in values {
+            let encoded = dtype
+                .encode_scalar(&value)
+                .expect("scalar encoding should succeed");
+            let decoded = dtype
+                .decode_scalar(&encoded)
+                .expect("scalar decoding should succeed");
+            assert_eq!(decoded, value);
+        }
     }
 }

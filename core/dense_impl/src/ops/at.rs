@@ -170,14 +170,9 @@ fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, D
 }
 
 fn scalar_from_element_bytes(dtype: DType, bytes: &[u8]) -> Scalar {
-    match dtype {
-        DType::F32 => Scalar::F32(f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])),
-        DType::I64 => Scalar::I64(i64::from_ne_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-        ])),
-        DType::U8 => Scalar::U8(bytes[0]),
-        DType::Bool => Scalar::Bool(bytes[0] != 0),
-    }
+    dtype
+        .decode_scalar(bytes)
+        .expect("single-element output buffer must decode as requested dtype")
 }
 
 fn insert_write_value_arg(
@@ -185,22 +180,17 @@ fn insert_write_value_arg(
     dtype: DType,
     value: Scalar,
 ) -> Result<(), DenseAtError> {
-    let insertion = match (dtype, value) {
-        (DType::F32, Scalar::F32(v)) => cpu_args.insert(KernelArg::f32(write_value_key(dtype), v)),
-        (DType::I64, Scalar::I64(v)) => cpu_args.insert(KernelArg::i64(write_value_key(dtype), v)),
-        (DType::U8, Scalar::U8(v)) => cpu_args.insert(KernelArg::u8(write_value_key(dtype), v)),
-        (DType::Bool, Scalar::Bool(v)) => {
-            cpu_args.insert(KernelArg::bool(write_value_key(dtype), v))
-        }
-        (tensor_dtype, other) => {
-            return Err(DenseAtError::ScalarDTypeMismatch {
-                tensor_dtype,
-                value: other,
-            });
-        }
-    };
+    if value.dtype() != dtype {
+        return Err(DenseAtError::ScalarDTypeMismatch {
+            tensor_dtype: dtype,
+            value,
+        });
+    }
 
-    insertion.map_err(DenseAtError::KernelArgs)
+    cpu_args
+        .args_mut()
+        .insert_scalar(write_value_key(dtype), value)
+        .map_err(DenseAtError::KernelArgs)
 }
 
 fn dense_dispatcher() -> &'static Mutex<Dispatcher> {

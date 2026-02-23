@@ -68,48 +68,15 @@ pub fn launch(
 
 fn encoded_value(args: &CpuKernelArgs, dtype: DType) -> Result<Vec<u8>, CpuKernelLaunchError> {
     let value_key = value_key(dtype);
-    match dtype {
-        DType::F32 => args
-            .args()
-            .require_as::<f32>(&value_key)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(|err| {
-                CpuKernelLaunchError::new(format!(
-                    "cpu.write_at requires f32 param arg '{}': {err:?}",
-                    value_key.tag().as_str()
-                ))
-            }),
-        DType::I64 => args
-            .args()
-            .require_as::<i64>(&value_key)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(|err| {
-                CpuKernelLaunchError::new(format!(
-                    "cpu.write_at requires i64 param arg '{}': {err:?}",
-                    value_key.tag().as_str()
-                ))
-            }),
-        DType::U8 => args
-            .args()
-            .require_as::<u8>(&value_key)
-            .map(|v| vec![*v])
-            .map_err(|err| {
-                CpuKernelLaunchError::new(format!(
-                    "cpu.write_at requires u8 param arg '{}': {err:?}",
-                    value_key.tag().as_str()
-                ))
-            }),
-        DType::Bool => args
-            .args()
-            .require_as::<bool>(&value_key)
-            .map(|v| vec![u8::from(*v)])
-            .map_err(|err| {
-                CpuKernelLaunchError::new(format!(
-                    "cpu.write_at requires bool param arg '{}': {err:?}",
-                    value_key.tag().as_str()
-                ))
-            }),
-    }
+    args.args()
+        .require_scalar_bytes(&value_key, dtype)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.write_at requires {:?} param arg '{}': {err:?}",
+                dtype,
+                value_key.tag().as_str()
+            ))
+        })
 }
 
 #[cfg(test)]

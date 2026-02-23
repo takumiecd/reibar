@@ -134,31 +134,26 @@ fn insert_fill_value_arg(
     dtype: DType,
     value: Scalar,
 ) -> Result<(), DenseFillError> {
-    let insertion = match (dtype, value) {
-        (DType::F32, Scalar::F32(v)) => cpu_args.insert(KernelArg::f32(value_key(dtype), v)),
-        (DType::I64, Scalar::I64(v)) => cpu_args.insert(KernelArg::i64(value_key(dtype), v)),
-        (DType::U8, Scalar::U8(v)) => cpu_args.insert(KernelArg::u8(value_key(dtype), v)),
-        (DType::Bool, Scalar::Bool(v)) => cpu_args.insert(KernelArg::bool(value_key(dtype), v)),
-        (tensor_dtype, other) => {
-            return Err(DenseFillError::ScalarDTypeMismatch {
-                tensor_dtype,
-                value: other,
-            });
-        }
-    };
+    if value.dtype() != dtype {
+        return Err(DenseFillError::ScalarDTypeMismatch {
+            tensor_dtype: dtype,
+            value,
+        });
+    }
 
-    insertion.map_err(DenseFillError::KernelArgs)
+    cpu_args
+        .args_mut()
+        .insert_scalar(value_key(dtype), value)
+        .map_err(DenseFillError::KernelArgs)
 }
 
 fn scalar_pattern(dtype: DType, value: Scalar) -> Result<Vec<u8>, DenseFillError> {
-    match (dtype, value) {
-        (DType::F32, Scalar::F32(v)) => Ok(v.to_ne_bytes().to_vec()),
-        (DType::I64, Scalar::I64(v)) => Ok(v.to_ne_bytes().to_vec()),
-        (DType::U8, Scalar::U8(v)) => Ok(vec![v]),
-        (DType::Bool, Scalar::Bool(v)) => Ok(vec![u8::from(v)]),
-        (tensor_dtype, other) => Err(DenseFillError::ScalarDTypeMismatch {
-            tensor_dtype,
-            value: other,
-        }),
+    if let Some(bytes) = dtype.encode_scalar(&value) {
+        Ok(bytes)
+    } else {
+        Err(DenseFillError::ScalarDTypeMismatch {
+            tensor_dtype: dtype,
+            value,
+        })
     }
 }

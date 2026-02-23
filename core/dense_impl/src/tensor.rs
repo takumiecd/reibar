@@ -142,26 +142,10 @@ pub(crate) fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
 
 fn read_scalar_at(bytes: &[u8], dtype: DType, element_bytes: usize, pos: usize) -> Scalar {
     let b = pos * element_bytes;
-    match dtype {
-        DType::F32 => Scalar::F32(f32::from_ne_bytes([
-            bytes[b],
-            bytes[b + 1],
-            bytes[b + 2],
-            bytes[b + 3],
-        ])),
-        DType::I64 => Scalar::I64(i64::from_ne_bytes([
-            bytes[b],
-            bytes[b + 1],
-            bytes[b + 2],
-            bytes[b + 3],
-            bytes[b + 4],
-            bytes[b + 5],
-            bytes[b + 6],
-            bytes[b + 7],
-        ])),
-        DType::U8 => Scalar::U8(bytes[b]),
-        DType::Bool => Scalar::Bool(bytes[b] != 0),
-    }
+    let e = b + element_bytes;
+    dtype
+        .decode_scalar(&bytes[b..e])
+        .expect("element byte slice must decode as tensor dtype")
 }
 
 #[cfg(test)]

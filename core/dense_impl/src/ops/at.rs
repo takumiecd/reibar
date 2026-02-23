@@ -1,6 +1,7 @@
 use std::sync::{Mutex, OnceLock};
 
 use execution::{CpuKernelArgs, KernelArgs, Storage, StorageAllocError, StorageContext, StorageRequest};
+use op_contracts::Scalar;
 use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
@@ -9,8 +10,8 @@ use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
 
 use crate::DenseTensorImpl;
 
-/// Read a single f32 element at the given multi-dimensional index.
-pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<f32, DenseAtError> {
+/// Read a single element at the given multi-dimensional index.
+pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, DenseAtError> {
     let pos = validated_pos(tensor, indices)?;
 
     let context = StorageContext::from_execution_tag(tensor.execution_tag());
@@ -55,16 +56,21 @@ pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<f32, Den
         f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
     });
 
-    Ok(value)
+    Ok(Scalar::F32(value))
 }
 
-/// Write a single f32 element at the given multi-dimensional index.
+/// Write a single element at the given multi-dimensional index.
 /// Uses interior mutability — `&DenseTensorImpl` is sufficient.
 pub fn exec_write(
     tensor: &DenseTensorImpl,
     indices: &[usize],
-    value: f32,
+    value: Scalar,
 ) -> Result<(), DenseAtError> {
+    let f32_value = match value {
+        Scalar::F32(v) => v,
+        other => return Err(DenseAtError::UnsupportedScalar(other)),
+    };
+
     let pos = validated_pos(tensor, indices)?;
 
     let out_cpu = match tensor.storage() {
@@ -79,7 +85,7 @@ pub fn exec_write(
         .insert(KernelArg::usize(pos_key(), pos))
         .map_err(DenseAtError::KernelArgs)?;
     cpu_args
-        .insert(KernelArg::f32(write_value_key(), value))
+        .insert(KernelArg::f32(write_value_key(), f32_value))
         .map_err(DenseAtError::KernelArgs)?;
     let args = KernelArgs::Cpu(cpu_args);
 
@@ -104,6 +110,7 @@ pub fn exec_write(
 pub enum DenseAtError {
     RankMismatch { expected: usize, actual: usize },
     IndexOutOfBounds { dim: usize, index: usize, size: usize },
+    UnsupportedScalar(Scalar),
     StorageAlloc(StorageAllocError),
     KernelArgs(schema::KernelArgsError),
     DispatcherPoisoned,
@@ -163,20 +170,20 @@ fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
     })
 }
 
-impl op_contracts::ReadAtF32Op<DenseTensorImpl> for super::DenseOps {
+impl op_contracts::ReadAtOp<DenseTensorImpl> for super::DenseOps {
     type Error = DenseAtError;
-    fn read_at_f32(&self, tensor: &DenseTensorImpl, indices: &[usize]) -> Result<f32, Self::Error> {
+    fn read_at(&self, tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, Self::Error> {
         exec_read(tensor, indices)
     }
 }
 
-impl op_contracts::WriteAtF32Op<DenseTensorImpl> for super::DenseOps {
+impl op_contracts::WriteAtOp<DenseTensorImpl> for super::DenseOps {
     type Error = DenseAtError;
-    fn write_at_f32(
+    fn write_at(
         &self,
         tensor: &DenseTensorImpl,
         indices: &[usize],
-        value: f32,
+        value: Scalar,
     ) -> Result<(), Self::Error> {
         exec_write(tensor, indices, value)
     }

@@ -1,9 +1,11 @@
-pub trait ReadAtF32Op<T> {
+use crate::Scalar;
+
+pub trait ReadAtOp<T> {
     type Error;
-    fn read_at_f32(&self, tensor: &T, indices: &[usize]) -> Result<f32, Self::Error>;
+    fn read_at(&self, tensor: &T, indices: &[usize]) -> Result<Scalar, Self::Error>;
 }
 
-pub trait WriteAtF32Op<T> {
+pub trait WriteAtOp<T> {
     type Error;
-    fn write_at_f32(&self, tensor: &T, indices: &[usize], value: f32) -> Result<(), Self::Error>;
+    fn write_at(&self, tensor: &T, indices: &[usize], value: Scalar) -> Result<(), Self::Error>;
 }

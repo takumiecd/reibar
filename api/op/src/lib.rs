@@ -5,9 +5,11 @@ pub mod narrow;
 pub use at::{at, set_at, AtError, SetAtError};
 pub use fill::{fill, fill_new, Fill, FillError};
 pub use narrow::{narrow, NarrowError};
+pub use op_contracts::Scalar;
 
 #[cfg(test)]
 mod tests {
+    use op_contracts::Scalar;
     use tensor::TensorBuilder;
 
     use super::{at, fill, fill_new, narrow, set_at};
@@ -37,8 +39,8 @@ mod tests {
     fn fill_new_does_not_mutate_original() {
         let tensor = dense_tensor(vec![2, 3]);
         let _filled = fill_new(&tensor, 9.0).expect("fill_new should succeed");
-        assert_eq!(at(&tensor, &[0, 0]).unwrap(), 0.0);
-        assert_eq!(at(&tensor, &[1, 2]).unwrap(), 0.0);
+        assert_eq!(at(&tensor, &[0, 0]).unwrap(), Scalar::F32(0.0));
+        assert_eq!(at(&tensor, &[1, 2]).unwrap(), Scalar::F32(0.0));
     }
 
     #[test]
@@ -56,7 +58,7 @@ mod tests {
         fill(&mut tensor, 1.5).expect("fill should succeed");
         for i in 0..2 {
             for j in 0..3 {
-                assert_eq!(at(&tensor, &[i, j]).unwrap(), 1.5);
+                assert_eq!(at(&tensor, &[i, j]).unwrap(), Scalar::F32(1.5));
             }
         }
     }
@@ -66,7 +68,7 @@ mod tests {
         let tensor = dense_tensor(vec![3]);
         let filled = fill_new(&tensor, 7.0).expect("fill_new should succeed");
         for i in 0..3 {
-            assert_eq!(at(&filled, &[i]).unwrap(), 7.0);
+            assert_eq!(at(&filled, &[i]).unwrap(), Scalar::F32(7.0));
         }
     }
 
@@ -76,24 +78,24 @@ mod tests {
     fn default_tensor_reads_zero_at_any_element() {
         let tensor = dense_tensor(vec![2, 3]);
         let v = at(&tensor, &[1, 2]).expect("at should succeed");
-        assert_eq!(v, 0.0);
+        assert_eq!(v, Scalar::F32(0.0));
     }
 
     #[test]
     fn set_at_then_at_returns_written_value() {
         let mut tensor = dense_tensor(vec![3, 3]);
-        set_at(&mut tensor, &[1, 1], 42.0).expect("set_at should succeed");
+        set_at(&mut tensor, &[1, 1], Scalar::F32(42.0)).expect("set_at should succeed");
         let v = at(&tensor, &[1, 1]).expect("at should succeed");
-        assert_eq!(v, 42.0);
+        assert_eq!(v, Scalar::F32(42.0));
     }
 
     #[test]
     fn set_at_does_not_affect_other_elements() {
         let mut tensor = dense_tensor(vec![2, 2]);
-        set_at(&mut tensor, &[0, 1], 5.0).expect("set_at should succeed");
-        assert_eq!(at(&tensor, &[0, 0]).unwrap(), 0.0);
-        assert_eq!(at(&tensor, &[1, 0]).unwrap(), 0.0);
-        assert_eq!(at(&tensor, &[1, 1]).unwrap(), 0.0);
+        set_at(&mut tensor, &[0, 1], Scalar::F32(5.0)).expect("set_at should succeed");
+        assert_eq!(at(&tensor, &[0, 0]).unwrap(), Scalar::F32(0.0));
+        assert_eq!(at(&tensor, &[1, 0]).unwrap(), Scalar::F32(0.0));
+        assert_eq!(at(&tensor, &[1, 1]).unwrap(), Scalar::F32(0.0));
     }
 
     // --- narrow ---
@@ -110,11 +112,11 @@ mod tests {
     fn narrow_view_reads_correct_values() {
         let mut tensor = dense_tensor(vec![4]);
         for i in 0..4 {
-            set_at(&mut tensor, &[i], i as f32).expect("set_at should succeed");
+            set_at(&mut tensor, &[i], Scalar::F32(i as f32)).expect("set_at should succeed");
         }
         let view = narrow(&tensor, 0, 1, 2).expect("narrow should succeed");
-        assert_eq!(at(&view, &[0]).unwrap(), 1.0);
-        assert_eq!(at(&view, &[1]).unwrap(), 2.0);
+        assert_eq!(at(&view, &[0]).unwrap(), Scalar::F32(1.0));
+        assert_eq!(at(&view, &[1]).unwrap(), Scalar::F32(2.0));
     }
 
     #[test]

@@ -180,4 +180,37 @@ mod tests {
         assert!(chunks.remainder().is_empty());
         values
     }
+
+    // Verifies the ExecutionStorage Clone contract: clone() must be a shared handle,
+    // not a deep copy. A write through the clone must be visible in the original.
+    #[test]
+    fn storage_clone_is_shallow_shared_handle() {
+        let context = StorageContext::from_execution_tag(ExecutionTag::Cpu);
+        let original = Storage::allocate(
+            ExecutionTag::Cpu,
+            &context,
+            StorageRequest::new(std::mem::size_of::<f32>(), DType::F32),
+        )
+        .expect("storage allocation should succeed");
+
+        let handle = original.clone();
+
+        let encoded = 42.0f32.to_ne_bytes();
+        match &handle {
+            Storage::Cpu(cpu) => cpu.buffer().with_write_bytes(|bytes| {
+                bytes[0..4].copy_from_slice(&encoded);
+            }),
+        }
+
+        let value = match &original {
+            Storage::Cpu(cpu) => cpu.buffer().with_read_bytes(|bytes| {
+                f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+            }),
+        };
+
+        assert_eq!(
+            value, 42.0f32,
+            "clone() must share the underlying allocation (shallow copy)"
+        );
+    }
 }

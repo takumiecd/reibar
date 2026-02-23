@@ -27,7 +27,12 @@ pub fn at(tensor: &Tensor, indices: &[usize]) -> Result<Scalar, AtError> {
 }
 
 /// Write a single element at the given indices. CPU tensors only.
-pub fn set_at(tensor: &mut Tensor, indices: &[usize], value: Scalar) -> Result<(), SetAtError> {
+pub fn set_at(
+    tensor: &mut Tensor,
+    indices: &[usize],
+    value: impl Into<Scalar>,
+) -> Result<(), SetAtError> {
+    let value = value.into();
     match tensor {
         Tensor::Dense(dense) if dense.execution_tag() == ExecutionTag::Cpu => DenseOps
             .write_at(dense, indices, value)

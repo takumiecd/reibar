@@ -3,24 +3,24 @@ use std::sync::{Mutex, OnceLock};
 use execution::{
     CpuKernelArgs, KernelArgs, Storage, StorageAllocError, StorageContext, StorageRequest,
 };
-use op_contracts::Scalar;
 use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar};
 
 use crate::DenseTensorImpl;
 
 /// Read a single element at the given multi-dimensional index.
 pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, DenseAtError> {
     let pos = validated_pos(tensor, indices)?;
+    let dtype = tensor.dtype();
 
     let context = StorageContext::from_execution_tag(tensor.execution_tag());
     let out = Storage::allocate(
         tensor.execution_tag(),
         &context,
-        StorageRequest::new(std::mem::size_of::<f32>(), DType::F32),
+        StorageRequest::new(dtype.size_bytes(), dtype),
     )
     .map_err(DenseAtError::StorageAlloc)?;
 
@@ -56,9 +56,9 @@ pub fn exec_read(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<Scalar, 
 
     let value = out_cpu
         .buffer()
-        .with_read_bytes(|bytes| f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
+        .with_read_bytes(|bytes| scalar_from_element_bytes(dtype, bytes));
 
-    Ok(Scalar::F32(value))
+    Ok(value)
 }
 
 /// Write a single element at the given multi-dimensional index.
@@ -68,12 +68,8 @@ pub fn exec_write(
     indices: &[usize],
     value: Scalar,
 ) -> Result<(), DenseAtError> {
-    let f32_value = match value {
-        Scalar::F32(v) => v,
-        other => return Err(DenseAtError::UnsupportedScalar(other)),
-    };
-
     let pos = validated_pos(tensor, indices)?;
+    let dtype = tensor.dtype();
 
     let out_cpu = match tensor.storage() {
         Storage::Cpu(storage) => storage.clone(),
@@ -86,9 +82,7 @@ pub fn exec_write(
     cpu_args
         .insert(KernelArg::usize(pos_key(), pos))
         .map_err(DenseAtError::KernelArgs)?;
-    cpu_args
-        .insert(KernelArg::f32(write_value_key(), f32_value))
-        .map_err(DenseAtError::KernelArgs)?;
+    insert_write_value_arg(&mut cpu_args, dtype, value)?;
     let args = KernelArgs::Cpu(cpu_args);
 
     let seed = SeedSpec::V1(V1KeyParts {
@@ -119,7 +113,10 @@ pub enum DenseAtError {
         index: usize,
         size: usize,
     },
-    UnsupportedScalar(Scalar),
+    ScalarDTypeMismatch {
+        tensor_dtype: DType,
+        value: Scalar,
+    },
     StorageAlloc(StorageAllocError),
     KernelArgs(schema::KernelArgsError),
     DispatcherPoisoned,
@@ -142,8 +139,8 @@ fn pos_key() -> ArgKey {
     ArgKey::new(ArgRole::Param, "pos", ArgKind::Usize)
 }
 
-fn write_value_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "value", ArgKind::F32)
+fn write_value_key(dtype: DType) -> ArgKey {
+    ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
 fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, DenseAtError> {
@@ -170,6 +167,30 @@ fn validated_pos(tensor: &DenseTensorImpl, indices: &[usize]) -> Result<usize, D
             .map(|(i, s)| i * s)
             .sum::<usize>();
     Ok(pos)
+}
+
+fn scalar_from_element_bytes(dtype: DType, bytes: &[u8]) -> Scalar {
+    dtype
+        .decode_scalar(bytes)
+        .expect("single-element output buffer must decode as requested dtype")
+}
+
+fn insert_write_value_arg(
+    cpu_args: &mut CpuKernelArgs,
+    dtype: DType,
+    value: Scalar,
+) -> Result<(), DenseAtError> {
+    if value.dtype() != dtype {
+        return Err(DenseAtError::ScalarDTypeMismatch {
+            tensor_dtype: dtype,
+            value,
+        });
+    }
+
+    cpu_args
+        .args_mut()
+        .insert_scalar(write_value_key(dtype), value)
+        .map_err(DenseAtError::KernelArgs)
 }
 
 fn dense_dispatcher() -> &'static Mutex<Dispatcher> {

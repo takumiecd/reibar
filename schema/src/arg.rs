@@ -1,4 +1,4 @@
-use crate::{ArgKey, ArgValue};
+use crate::{ArgKey, ArgValue, Scalar, ScalarBuffer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KernelArg<S> {
@@ -15,20 +15,16 @@ impl<S> KernelArg<S> {
         Self::new(key, ArgValue::Storage(value))
     }
 
-    pub fn f32(key: ArgKey, value: f32) -> Self {
-        Self::new(key, ArgValue::F32(value))
+    pub fn scalar_buffer(key: ArgKey, value: ScalarBuffer) -> Self {
+        Self::new(key, ArgValue::ScalarBuffer(value))
     }
 
-    pub fn i64(key: ArgKey, value: i64) -> Self {
-        Self::new(key, ArgValue::I64(value))
+    pub fn scalar(key: ArgKey, value: Scalar) -> Self {
+        Self::new(key, ArgValue::Scalar(value))
     }
 
     pub fn usize(key: ArgKey, value: usize) -> Self {
         Self::new(key, ArgValue::Usize(value))
-    }
-
-    pub fn bool(key: ArgKey, value: bool) -> Self {
-        Self::new(key, ArgValue::Bool(value))
     }
 
     pub fn key(&self) -> &ArgKey {

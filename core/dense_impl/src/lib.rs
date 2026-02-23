@@ -10,6 +10,7 @@ pub use tensor::DenseTensorImpl;
 mod tests {
     use execution::ExecutionTag;
     use op_contracts::FillOp;
+    use schema::Scalar;
 
     use super::{DenseBuildError, DenseBuilder, ops::DenseOps};
 
@@ -20,7 +21,7 @@ mod tests {
             .expect("dense build should succeed");
 
         DenseOps
-            .fill_inplace(&mut tensor, 1.5)
+            .fill_inplace(&mut tensor, Scalar::F32(1.5))
             .expect("fill should succeed");
 
         assert_eq!(tensor.shape(), &[2, 3]);
@@ -47,7 +48,7 @@ mod tests {
             .expect("dense build should succeed");
 
         DenseOps
-            .fill_inplace(&mut tensor, 9.5)
+            .fill_inplace(&mut tensor, Scalar::F32(9.5))
             .expect("fill op should succeed");
         assert_eq!(tensor.data(), vec![9.5, 9.5, 9.5, 9.5]);
     }

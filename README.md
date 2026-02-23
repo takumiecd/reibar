@@ -13,6 +13,11 @@ The name is inspired by *reinforcing bar* ("rebar"), with the project-specific s
 
 Work in progress.
 
+## Design Docs
+
+- Type-system guide (`DType`, `Scalar`, `Arg*`): `docs/type-system.md`
+- Schema module guide: `schema/README.md`
+
 ## Local CI
 
 Run the same `check-and-test` job as GitHub Actions with one command:

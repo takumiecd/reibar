@@ -87,6 +87,9 @@ dependencies = [
 [[package]]
 name = "op_contracts"
 version = "0.1.0"
+dependencies = [
+ "schema",
+]
 
 [[package]]
 name = "runtime"
@@ -108,4 +111,5 @@ version = "0.1.0"
 dependencies = [
  "dense_impl",
  "execution",
+ "schema",
 ]

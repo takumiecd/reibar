@@ -10,12 +10,19 @@ pub use op_contracts::Scalar;
 #[cfg(test)]
 mod tests {
     use op_contracts::Scalar;
-    use tensor::TensorBuilder;
+    use tensor::{DType, TensorBuilder};
 
     use super::{at, fill, fill_new, narrow, set_at};
 
     fn dense_tensor(shape: Vec<usize>) -> tensor::Tensor {
         TensorBuilder::dense(shape)
+            .build()
+            .expect("tensor build should succeed")
+    }
+
+    fn dense_tensor_with_dtype(shape: Vec<usize>, dtype: DType) -> tensor::Tensor {
+        TensorBuilder::dense(shape)
+            .with_dtype(dtype)
             .build()
             .expect("tensor build should succeed")
     }
@@ -72,6 +79,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn fill_supports_i64_tensor_dtype() {
+        let mut tensor = dense_tensor_with_dtype(vec![3], DType::I64);
+        fill(&mut tensor, 12i64).expect("fill should succeed for i64");
+        for i in 0..3 {
+            assert_eq!(at(&tensor, &[i]).unwrap(), Scalar::I64(12));
+        }
+    }
+
     // --- at / set_at ---
 
     #[test]
@@ -117,6 +133,22 @@ mod tests {
         let view = narrow(&tensor, 0, 1, 2).expect("narrow should succeed");
         assert_eq!(at(&view, &[0]).unwrap(), Scalar::F32(1.0));
         assert_eq!(at(&view, &[1]).unwrap(), Scalar::F32(2.0));
+    }
+
+    #[test]
+    fn fill_on_view_updates_shared_storage_region_only() {
+        let mut base = dense_tensor(vec![4]);
+        for i in 0..4 {
+            set_at(&mut base, &[i], i as f32).expect("set_at should succeed");
+        }
+
+        let mut view = narrow(&base, 0, 1, 2).expect("narrow should succeed");
+        fill(&mut view, 9.0).expect("fill on view should succeed");
+
+        assert_eq!(at(&base, &[0]).unwrap(), Scalar::F32(0.0));
+        assert_eq!(at(&base, &[1]).unwrap(), Scalar::F32(9.0));
+        assert_eq!(at(&base, &[2]).unwrap(), Scalar::F32(9.0));
+        assert_eq!(at(&base, &[3]).unwrap(), Scalar::F32(3.0));
     }
 
     #[test]

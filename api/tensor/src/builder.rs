@@ -1,4 +1,5 @@
 use dense_impl::{DenseBuildError, DenseBuilder};
+use schema::DType;
 
 use crate::tag::TensorTag;
 use crate::tensor::Tensor;
@@ -16,6 +17,12 @@ impl TensorBuilder {
     pub fn tag(&self) -> TensorTag {
         match self {
             Self::Dense(_) => TensorTag::Dense,
+        }
+    }
+
+    pub fn with_dtype(self, dtype: DType) -> Self {
+        match self {
+            Self::Dense(builder) => Self::Dense(builder.with_dtype(dtype)),
         }
     }
 

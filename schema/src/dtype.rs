@@ -1,3 +1,5 @@
+use crate::{ArgKind, EncodedScalar, Scalar};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DType {
     F32,
@@ -23,5 +25,36 @@ impl DType {
             Self::U8 => std::mem::align_of::<u8>(),
             Self::Bool => std::mem::align_of::<bool>(),
         }
+    }
+
+    pub fn value_arg_kind(self) -> ArgKind {
+        ArgKind::Scalar(self)
+    }
+
+    pub fn encode_scalar(self, value: &Scalar) -> Option<EncodedScalar> {
+        match (self, value) {
+            (Self::F32, Scalar::F32(v)) => Some(EncodedScalar::from_array(v.to_ne_bytes())),
+            (Self::I64, Scalar::I64(v)) => Some(EncodedScalar::from_array(v.to_ne_bytes())),
+            (Self::U8, Scalar::U8(v)) => Some(EncodedScalar::from_byte(*v)),
+            (Self::Bool, Scalar::Bool(v)) => Some(EncodedScalar::from_byte(u8::from(*v))),
+            _ => None,
+        }
+    }
+
+    pub fn decode_scalar(self, bytes: &[u8]) -> Option<Scalar> {
+        if bytes.len() != self.size_bytes() {
+            return None;
+        }
+
+        let value = match self {
+            Self::F32 => Scalar::F32(f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])),
+            Self::I64 => Scalar::I64(i64::from_ne_bytes([
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            ])),
+            Self::U8 => Scalar::U8(bytes[0]),
+            Self::Bool => Scalar::Bool(bytes[0] != 0),
+        };
+
+        Some(value)
     }
 }

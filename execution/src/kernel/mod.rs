@@ -89,7 +89,7 @@ for_each_backend!(define_kernel_types);
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, StorageValue};
+    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, StorageValue};
 
     use super::{KernelContext, KernelLauncher, KernelMetadata};
     use crate::{
@@ -122,8 +122,8 @@ mod tests {
         let cpu_context = CpuKernelContext::new().with_worker_threads(4);
         let mut args = CpuKernelArgs::new().with_context(cpu_context.clone());
         let input_key = ArgKey::new(ArgRole::Input, "dst", ArgKind::Storage);
-        let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
-        let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::F32);
+        let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::Scalar(DType::F32));
+        let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::Scalar(DType::F32));
 
         args.insert(KernelArg::storage(
             input_key.clone(),
@@ -135,9 +135,9 @@ mod tests {
             .expect("typed storage creation should succeed"),
         ))
         .expect("storage insertion should succeed");
-        args.insert(KernelArg::f32(alpha_key.clone(), 1.0))
+        args.insert(KernelArg::scalar(alpha_key.clone(), Scalar::F32(1.0)))
             .expect("alpha insertion should succeed");
-        args.insert(KernelArg::f32(beta_key.clone(), 2.0))
+        args.insert(KernelArg::scalar(beta_key.clone(), Scalar::F32(2.0)))
             .expect("beta insertion should succeed");
 
         match launcher {

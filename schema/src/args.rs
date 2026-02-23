@@ -1,4 +1,6 @@
-use crate::{ArgKey, ArgValueAccess, KernelArg, KernelArgsError};
+use crate::{
+    ArgKey, ArgValueAccess, DType, EncodedScalar, KernelArg, KernelArgsError, Scalar, ScalarBuffer,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KernelArgs<S> {
@@ -61,6 +63,47 @@ impl<S> KernelArgs<S> {
             .iter()
             .find(|arg| arg.key() == key)
             .ok_or_else(|| KernelArgsError::MissingKey { key: key.clone() })
+    }
+
+    pub fn insert_scalar(&mut self, key: ArgKey, value: Scalar) -> Result<(), KernelArgsError> {
+        self.insert(KernelArg::scalar(key, value))
+    }
+
+    pub fn insert_scalar_buffer(
+        &mut self,
+        key: ArgKey,
+        value: ScalarBuffer,
+    ) -> Result<(), KernelArgsError> {
+        self.insert(KernelArg::scalar_buffer(key, value))
+    }
+
+    pub fn require_scalar(&self, key: &ArgKey, dtype: DType) -> Result<Scalar, KernelArgsError> {
+        match dtype {
+            DType::F32 => self.require_as::<f32>(key).map(|v| Scalar::F32(*v)),
+            DType::I64 => self.require_as::<i64>(key).map(|v| Scalar::I64(*v)),
+            DType::U8 => self.require_as::<u8>(key).map(|v| Scalar::U8(*v)),
+            DType::Bool => self.require_as::<bool>(key).map(|v| Scalar::Bool(*v)),
+        }
+    }
+
+    pub fn require_encoded_scalar(
+        &self,
+        key: &ArgKey,
+        dtype: DType,
+    ) -> Result<EncodedScalar, KernelArgsError> {
+        let value = self.require_scalar(key, dtype)?;
+        match dtype.encode_scalar(&value) {
+            Some(encoded) => Ok(encoded),
+            None => Err(KernelArgsError::TypeMismatch {
+                key: key.clone(),
+                expected: dtype.value_arg_kind(),
+                actual: value.arg_kind(),
+            }),
+        }
+    }
+
+    pub fn require_scalar_buffer(&self, key: &ArgKey) -> Result<&ScalarBuffer, KernelArgsError> {
+        self.require_as::<ScalarBuffer>(key)
     }
 }
 

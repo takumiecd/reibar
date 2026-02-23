@@ -3,6 +3,7 @@ mod tag;
 mod tensor;
 
 pub use builder::{TensorBuildError, TensorBuilder};
+pub use schema::DType;
 pub use tag::TensorTag;
 pub use tensor::Tensor;
 

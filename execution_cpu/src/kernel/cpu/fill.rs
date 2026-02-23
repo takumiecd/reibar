@@ -41,19 +41,22 @@ pub fn launch(
         )));
     }
 
-    out_storage.buffer().with_write_bytes(|out| {
-        if out.len() % std::mem::size_of::<f32>() != 0 {
-            return Err(CpuKernelLaunchError::new(
-                "cpu.fill requires output byte-size to be multiple of f32 size",
-            ));
-        }
+    let element_bytes = std::mem::size_of::<f32>();
+    out_storage
+        .buffer()
+        .with_write_bytes(|out| -> Result<(), CpuKernelLaunchError> {
+            if out.len() % element_bytes != 0 {
+                return Err(CpuKernelLaunchError::new(
+                    "cpu.fill requires output byte-size to be multiple of f32 size",
+                ));
+            }
 
-        let pattern = value.to_ne_bytes();
-        for chunk in out.chunks_exact_mut(std::mem::size_of::<f32>()) {
-            chunk.copy_from_slice(&pattern);
-        }
-        Ok(())
-    })?;
+            let pattern = value.to_ne_bytes();
+            for chunk in out.chunks_exact_mut(element_bytes) {
+                chunk.copy_from_slice(&pattern);
+            }
+            Ok(())
+        })?;
 
     Ok(())
 }

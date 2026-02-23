@@ -1,5 +1,6 @@
 use crate::{
     ArgKey, ArgValueAccess, DType, EncodedScalar, KernelArg, KernelArgsError, Scalar, ScalarBuffer,
+    ViewSpec,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,6 +105,18 @@ impl<S> KernelArgs<S> {
 
     pub fn require_scalar_buffer(&self, key: &ArgKey) -> Result<&ScalarBuffer, KernelArgsError> {
         self.require_as::<ScalarBuffer>(key)
+    }
+
+    pub fn insert_view_spec(
+        &mut self,
+        key: ArgKey,
+        value: ViewSpec,
+    ) -> Result<(), KernelArgsError> {
+        self.insert(KernelArg::view_spec(key, value))
+    }
+
+    pub fn require_view_spec(&self, key: &ArgKey) -> Result<&ViewSpec, KernelArgsError> {
+        self.require_as::<ViewSpec>(key)
     }
 }
 

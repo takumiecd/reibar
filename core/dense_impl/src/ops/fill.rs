@@ -5,7 +5,7 @@ use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, ScalarBuffer};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, ViewSpec, ViewSpecError};
 
 use crate::DenseTensorImpl;
 
@@ -23,9 +23,7 @@ fn dispatch_fill_kernel(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), D
         .insert(KernelArg::storage(output_key(), out))
         .map_err(DenseFillError::KernelArgs)?;
     insert_fill_value_arg(&mut cpu_args, dtype, value)?;
-    if !tensor.is_packed() {
-        insert_fill_view_args(&mut cpu_args, tensor)?;
-    }
+    insert_fill_view_args(&mut cpu_args, tensor)?;
     let args = KernelArgs::Cpu(cpu_args);
 
     let seed = SeedSpec::V1(V1KeyParts {
@@ -47,21 +45,8 @@ fn dispatch_fill_kernel(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), D
 
 #[derive(Debug)]
 pub enum DenseFillError {
-    ScalarDTypeMismatch {
-        tensor_dtype: DType,
-        value: Scalar,
-    },
-    PositionOverflow {
-        pos: usize,
-        element_bytes: usize,
-    },
-    ViewOutOfBounds {
-        pos: usize,
-        range_start: usize,
-        range_end: usize,
-        buffer_len: usize,
-    },
-    ViewMetadataOverflow,
+    ScalarDTypeMismatch { tensor_dtype: DType, value: Scalar },
+    InvalidViewSpec(ViewSpecError),
     DispatcherPoisoned,
     KernelArgs(schema::KernelArgsError),
     Dispatch(DispatchError),
@@ -75,16 +60,8 @@ fn value_key(dtype: DType) -> ArgKey {
     ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
 }
 
-fn view_shape_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "view_shape", ArgKind::ScalarBuffer)
-}
-
-fn view_strides_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "view_strides", ArgKind::ScalarBuffer)
-}
-
-fn view_offset_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "view_offset", ArgKind::Usize)
+fn view_spec_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "view_spec", ArgKind::ViewSpec)
 }
 
 fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
@@ -128,33 +105,15 @@ fn insert_fill_view_args(
     tensor: &DenseTensorImpl,
 ) -> Result<(), DenseFillError> {
     cpu_args
-        .insert(KernelArg::scalar_buffer(
-            view_shape_key(),
-            usize_slice_to_i64_scalar_buffer(tensor.shape())?,
+        .insert(KernelArg::view_spec(
+            view_spec_key(),
+            ViewSpec::new(
+                tensor.shape().to_vec(),
+                tensor.strides().to_vec(),
+                tensor.offset(),
+            )
+            .map_err(DenseFillError::InvalidViewSpec)?,
         ))
-        .map_err(DenseFillError::KernelArgs)?;
-    cpu_args
-        .insert(KernelArg::scalar_buffer(
-            view_strides_key(),
-            usize_slice_to_i64_scalar_buffer(tensor.strides())?,
-        ))
-        .map_err(DenseFillError::KernelArgs)?;
-    cpu_args
-        .insert(KernelArg::usize(view_offset_key(), tensor.offset()))
         .map_err(DenseFillError::KernelArgs)?;
     Ok(())
-}
-
-fn usize_slice_to_i64_scalar_buffer(values: &[usize]) -> Result<ScalarBuffer, DenseFillError> {
-    let mut bytes = Vec::with_capacity(
-        values
-            .len()
-            .checked_mul(std::mem::size_of::<i64>())
-            .ok_or(DenseFillError::ViewMetadataOverflow)?,
-    );
-    for &value in values {
-        let value = i64::try_from(value).map_err(|_| DenseFillError::ViewMetadataOverflow)?;
-        bytes.extend_from_slice(&value.to_ne_bytes());
-    }
-    ScalarBuffer::new(DType::I64, values.len(), bytes).ok_or(DenseFillError::ViewMetadataOverflow)
 }

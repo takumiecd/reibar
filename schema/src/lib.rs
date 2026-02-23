@@ -9,6 +9,7 @@ mod scalar;
 mod scalar_buffer;
 mod stack_vector;
 mod value;
+mod view_spec;
 
 pub use arg::KernelArg;
 pub use args::KernelArgs;
@@ -21,12 +22,13 @@ pub use scalar::Scalar;
 pub use scalar_buffer::{ScalarBuffer, ScalarBufferDecodeError, ScalarBufferElement};
 pub use stack_vector::{StackVector, StackVectorError};
 pub use value::{ArgKind, ArgValue, ArgValueAccess, StorageValue};
+pub use view_spec::{ViewSpec, ViewSpecError};
 
 #[cfg(test)]
 mod tests {
     use super::{
         ArgKey, ArgKind, ArgRole, DType, KernelArg, KernelArgs, KernelArgsError, Scalar,
-        ScalarBuffer, ScalarBufferDecodeError, StackVector, StorageValue,
+        ScalarBuffer, ScalarBufferDecodeError, StackVector, StorageValue, ViewSpec,
     };
 
     #[test]
@@ -236,6 +238,20 @@ mod tests {
         let stack = StackVector::<i64, 8>::try_from_scalar_buffer(&values)
             .expect("stack vector decode should succeed");
         assert_eq!(stack.as_slice(), &[4, 5, 6]);
+    }
+
+    #[test]
+    fn kernel_args_insert_and_require_view_spec() {
+        let mut args: KernelArgs<()> = KernelArgs::new();
+        let key = ArgKey::new(ArgRole::Param, "view", ArgKind::ViewSpec);
+        let view = ViewSpec::new(vec![2, 3], vec![3, 1], 4).expect("view should be valid");
+        args.insert_view_spec(key.clone(), view.clone())
+            .expect("view spec insertion should succeed");
+
+        let got = args
+            .require_view_spec(&key)
+            .expect("view spec retrieval should succeed");
+        assert_eq!(got, &view);
     }
 
     #[test]

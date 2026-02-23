@@ -17,7 +17,9 @@ pub enum FillError {
 /// Fill all elements of `tensor` in-place with `value`.
 pub fn fill(tensor: &mut Tensor, value: f32) -> Result<(), FillError> {
     match tensor {
-        Tensor::Dense(dense) => DenseOps.fill_inplace(dense, value).map_err(FillError::Dense),
+        Tensor::Dense(dense) => DenseOps
+            .fill_inplace(dense, value)
+            .map_err(FillError::Dense),
     }
 }
 

@@ -1,4 +1,4 @@
-use dense_impl::{DenseBuilder, DenseBuildError};
+use dense_impl::{DenseBuildError, DenseBuilder};
 
 use crate::tag::TensorTag;
 use crate::tensor::Tensor;

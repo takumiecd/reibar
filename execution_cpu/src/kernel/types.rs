@@ -65,6 +65,10 @@ impl CpuKernelArgs {
     pub fn len(&self) -> usize {
         self.args.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.args.len() == 0
+    }
 }
 
 impl Default for CpuKernelArgs {

@@ -11,7 +11,12 @@ pub struct DenseTensorImpl {
 impl DenseTensorImpl {
     pub(crate) fn new(shape: Vec<usize>, storage: Storage) -> Self {
         let strides = contiguous_strides(&shape);
-        Self { shape, strides, offset: 0, storage }
+        Self {
+            shape,
+            strides,
+            offset: 0,
+            storage,
+        }
     }
 
     pub(crate) fn with_view(
@@ -20,7 +25,12 @@ impl DenseTensorImpl {
         offset: usize,
         storage: Storage,
     ) -> Self {
-        Self { shape, strides, offset, storage }
+        Self {
+            shape,
+            strides,
+            offset,
+            storage,
+        }
     }
 
     pub fn shape(&self) -> &[usize] {
@@ -57,18 +67,31 @@ impl DenseTensorImpl {
     pub fn read_all_f32(&self) -> Vec<f32> {
         let numel = self.numel();
         let mut result = Vec::with_capacity(numel);
+        let is_contiguous = self.strides == contiguous_strides(&self.shape);
         match &self.storage {
             Storage::Cpu(storage) => {
                 storage.buffer().with_read_bytes(|bytes| {
-                    for i in 0..numel {
-                        let pos = flat_to_pos(i, &self.shape, &self.strides, self.offset);
-                        let b = pos * 4;
-                        result.push(f32::from_ne_bytes([
-                            bytes[b],
-                            bytes[b + 1],
-                            bytes[b + 2],
-                            bytes[b + 3],
-                        ]));
+                    if is_contiguous {
+                        for i in 0..numel {
+                            let b = (self.offset + i) * std::mem::size_of::<f32>();
+                            result.push(f32::from_ne_bytes([
+                                bytes[b],
+                                bytes[b + 1],
+                                bytes[b + 2],
+                                bytes[b + 3],
+                            ]));
+                        }
+                    } else {
+                        for i in 0..numel {
+                            let pos = flat_to_pos(i, &self.shape, &self.strides, self.offset);
+                            let b = pos * std::mem::size_of::<f32>();
+                            result.push(f32::from_ne_bytes([
+                                bytes[b],
+                                bytes[b + 1],
+                                bytes[b + 2],
+                                bytes[b + 3],
+                            ]));
+                        }
                     }
                 });
             }
@@ -107,18 +130,31 @@ impl DenseTensorImpl {
     pub fn data(&self) -> Vec<f32> {
         let numel = self.numel();
         let mut result = Vec::with_capacity(numel);
+        let is_contiguous = self.strides == contiguous_strides(&self.shape);
         match &self.storage {
             Storage::Cpu(storage) => {
                 storage.buffer().with_read_bytes(|bytes| {
-                    for i in 0..numel {
-                        let pos = flat_to_pos(i, &self.shape, &self.strides, self.offset);
-                        let b = pos * 4;
-                        result.push(f32::from_ne_bytes([
-                            bytes[b],
-                            bytes[b + 1],
-                            bytes[b + 2],
-                            bytes[b + 3],
-                        ]));
+                    if is_contiguous {
+                        for i in 0..numel {
+                            let b = (self.offset + i) * std::mem::size_of::<f32>();
+                            result.push(f32::from_ne_bytes([
+                                bytes[b],
+                                bytes[b + 1],
+                                bytes[b + 2],
+                                bytes[b + 3],
+                            ]));
+                        }
+                    } else {
+                        for i in 0..numel {
+                            let pos = flat_to_pos(i, &self.shape, &self.strides, self.offset);
+                            let b = pos * std::mem::size_of::<f32>();
+                            result.push(f32::from_ne_bytes([
+                                bytes[b],
+                                bytes[b + 1],
+                                bytes[b + 2],
+                                bytes[b + 3],
+                            ]));
+                        }
                     }
                 });
             }

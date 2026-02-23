@@ -2,7 +2,7 @@ mod builder;
 mod tag;
 mod tensor;
 
-pub use builder::{TensorBuilder, TensorBuildError};
+pub use builder::{TensorBuildError, TensorBuilder};
 pub use tag::TensorTag;
 pub use tensor::Tensor;
 

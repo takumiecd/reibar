@@ -2,7 +2,7 @@ mod builder;
 pub mod ops;
 mod tensor;
 
-pub use builder::{DenseBuilder, DenseBuildError};
+pub use builder::{DenseBuildError, DenseBuilder};
 pub use ops::DenseOps;
 pub use tensor::DenseTensorImpl;
 
@@ -11,7 +11,7 @@ mod tests {
     use execution::ExecutionTag;
     use op_contracts::FillOp;
 
-    use super::{ops::DenseOps, DenseBuilder, DenseBuildError};
+    use super::{DenseBuildError, DenseBuilder, ops::DenseOps};
 
     #[test]
     fn build_then_fill() {
@@ -19,7 +19,9 @@ mod tests {
             .build()
             .expect("dense build should succeed");
 
-        DenseOps.fill_inplace(&mut tensor, 1.5).expect("fill should succeed");
+        DenseOps
+            .fill_inplace(&mut tensor, 1.5)
+            .expect("fill should succeed");
 
         assert_eq!(tensor.shape(), &[2, 3]);
         assert_eq!(tensor.strides(), &[3, 1]);
@@ -44,7 +46,9 @@ mod tests {
             .build()
             .expect("dense build should succeed");
 
-        DenseOps.fill_inplace(&mut tensor, 9.5).expect("fill op should succeed");
+        DenseOps
+            .fill_inplace(&mut tensor, 9.5)
+            .expect("fill op should succeed");
         assert_eq!(tensor.data(), vec![9.5, 9.5, 9.5, 9.5]);
     }
 

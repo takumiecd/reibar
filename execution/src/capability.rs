@@ -25,3 +25,15 @@ macro_rules! define_capability_types {
 }
 
 for_each_backend!(define_capability_types);
+
+#[cfg(test)]
+mod tests {
+    use super::Capability;
+    use crate::ExecutionTag;
+
+    #[test]
+    fn capability_follows_execution_tag() {
+        let capability = Capability::from_execution_tag(ExecutionTag::Cpu);
+        assert_eq!(capability.tag(), ExecutionTag::Cpu);
+    }
+}

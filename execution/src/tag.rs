@@ -31,3 +31,14 @@ macro_rules! define_execution_types {
 }
 
 for_each_backend!(define_execution_types);
+
+#[cfg(test)]
+mod tests {
+    use super::ExecutionTag;
+
+    #[test]
+    fn execution_tag_builds_cpu_execution() {
+        let execution = ExecutionTag::Cpu.execution();
+        assert_eq!(execution.tag(), ExecutionTag::Cpu);
+    }
+}

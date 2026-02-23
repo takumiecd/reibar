@@ -19,7 +19,7 @@ impl ScalarBuffer {
 
     pub fn from_bytes(dtype: DType, bytes: Vec<u8>) -> Option<Self> {
         let element_size = dtype.size_bytes();
-        if bytes.len() % element_size != 0 {
+        if !bytes.len().is_multiple_of(element_size) {
             return None;
         }
         let len = bytes.len() / element_size;

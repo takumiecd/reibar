@@ -13,6 +13,14 @@ The name is inspired by *reinforcing bar* ("rebar"), with the project-specific s
 
 Work in progress.
 
+## Local CI
+
+Run the same `check-and-test` job as GitHub Actions with one command:
+
+```bash
+make ci
+```
+
 ## Layers
 
 - `api/`: user-facing API layer

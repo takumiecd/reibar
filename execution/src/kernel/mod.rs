@@ -89,7 +89,7 @@ for_each_backend!(define_kernel_types);
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, StorageValue};
+    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, StorageValue};
 
     use super::{KernelContext, KernelLauncher, KernelMetadata};
     use crate::{
@@ -135,9 +135,9 @@ mod tests {
             .expect("typed storage creation should succeed"),
         ))
         .expect("storage insertion should succeed");
-        args.insert(KernelArg::f32(alpha_key.clone(), 1.0))
+        args.insert(KernelArg::scalar(alpha_key.clone(), Scalar::F32(1.0)))
             .expect("alpha insertion should succeed");
-        args.insert(KernelArg::f32(beta_key.clone(), 2.0))
+        args.insert(KernelArg::scalar(beta_key.clone(), Scalar::F32(2.0)))
             .expect("beta insertion should succeed");
 
         match launcher {

@@ -81,7 +81,7 @@ fn encoded_value(args: &CpuKernelArgs, dtype: DType) -> Result<Vec<u8>, CpuKerne
 
 #[cfg(test)]
 mod tests {
-    use schema::{DType, KernelArg};
+    use schema::{DType, KernelArg, Scalar};
 
     use super::{launch, output_key, pos_key, value_key};
     use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
@@ -99,7 +99,7 @@ mod tests {
             .expect("out insertion should succeed");
         args.insert(KernelArg::usize(pos_key(), 2))
             .expect("pos insertion should succeed");
-        args.insert(KernelArg::f32(value_key(DType::F32), 7.5))
+        args.insert(KernelArg::scalar(value_key(DType::F32), Scalar::F32(7.5)))
             .expect("value insertion should succeed");
 
         launch(&args, &CpuKernelLaunchConfig::new("cpu.write_at"))
@@ -122,7 +122,7 @@ mod tests {
             .expect("out insertion should succeed");
         args.insert(KernelArg::usize(pos_key(), 2))
             .expect("pos insertion should succeed");
-        args.insert(KernelArg::f32(value_key(DType::F32), 1.25))
+        args.insert(KernelArg::scalar(value_key(DType::F32), Scalar::F32(1.25)))
             .expect("value insertion should succeed");
 
         let err = launch(&args, &CpuKernelLaunchConfig::new("cpu.write_at"))
@@ -143,7 +143,7 @@ mod tests {
             .expect("out insertion should succeed");
         args.insert(KernelArg::usize(pos_key(), 1))
             .expect("pos insertion should succeed");
-        args.insert(KernelArg::i64(value_key(DType::I64), 9))
+        args.insert(KernelArg::scalar(value_key(DType::I64), Scalar::I64(9)))
             .expect("value insertion should succeed");
 
         launch(&args, &CpuKernelLaunchConfig::new("cpu.write_at"))

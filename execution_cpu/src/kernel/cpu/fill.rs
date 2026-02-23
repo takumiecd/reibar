@@ -64,7 +64,7 @@ fn encoded_value(args: &CpuKernelArgs, dtype: DType) -> Result<Vec<u8>, CpuKerne
 
 #[cfg(test)]
 mod tests {
-    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg};
+    use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar};
 
     use super::{launch, output_key, value_key};
     use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
@@ -80,7 +80,7 @@ mod tests {
         .expect("typed storage creation should succeed");
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
-        args.insert(KernelArg::f32(value_key(DType::F32), 3.0))
+        args.insert(KernelArg::scalar(value_key(DType::F32), Scalar::F32(3.0)))
             .expect("value insertion should succeed");
 
         launch(&args, &CpuKernelLaunchConfig::new("cpu.fill"))
@@ -122,7 +122,7 @@ mod tests {
         .expect("typed storage creation should succeed");
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
-        args.insert(KernelArg::i64(value_key(DType::I64), 7))
+        args.insert(KernelArg::scalar(value_key(DType::I64), Scalar::I64(7)))
             .expect("value insertion should succeed");
 
         launch(&args, &CpuKernelLaunchConfig::new("cpu.fill"))

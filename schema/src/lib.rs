@@ -33,7 +33,7 @@ mod tests {
 
         args.insert(KernelArg::storage(input.clone(), ()))
             .expect("storage insertion should succeed");
-        args.insert(KernelArg::f32(alpha.clone(), 1.5))
+        args.insert(KernelArg::scalar(alpha.clone(), Scalar::F32(1.5)))
             .expect("param insertion should succeed");
 
         assert_eq!(args.len(), 2);
@@ -62,7 +62,7 @@ mod tests {
     fn kernel_args_detect_type_mismatch() {
         let mut args: KernelArgs<()> = KernelArgs::new();
         let key = ArgKey::new(ArgRole::Param, "beta", ArgKind::Scalar(DType::I64));
-        args.insert(KernelArg::i64(key.clone(), 42))
+        args.insert(KernelArg::scalar(key.clone(), Scalar::I64(42)))
             .expect("insertion should succeed");
 
         let result = args.require_as::<f32>(&key);
@@ -81,7 +81,7 @@ mod tests {
         let mut args: KernelArgs<()> = KernelArgs::new();
         let key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::Scalar(DType::F32));
 
-        let result = args.insert(KernelArg::i64(key.clone(), 42));
+        let result = args.insert(KernelArg::scalar(key.clone(), Scalar::I64(42)));
         assert_eq!(
             result,
             Err(KernelArgsError::TypeMismatch {

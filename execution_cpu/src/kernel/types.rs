@@ -67,7 +67,7 @@ impl CpuKernelArgs {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.args.len() == 0
+        self.args.is_empty()
     }
 }
 

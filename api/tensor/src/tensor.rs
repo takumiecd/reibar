@@ -2,6 +2,7 @@ use std::fmt;
 
 use dense_impl::DenseTensorImpl;
 use execution::ExecutionTag;
+use schema::DType;
 
 use crate::tag::TensorTag;
 
@@ -22,21 +23,29 @@ impl Tensor {
             Self::Dense(t) => t.shape(),
         }
     }
+
+    pub fn dtype(&self) -> DType {
+        match self {
+            Self::Dense(t) => t.dtype(),
+        }
+    }
 }
 
 impl fmt::Debug for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Dense(dense) if dense.execution_tag() == ExecutionTag::Cpu => {
-                let data = dense.read_all_f32();
+                let data = dense.read_all_scalars();
                 f.debug_struct("Tensor")
                     .field("shape", &dense.shape())
+                    .field("dtype", &dense.dtype())
                     .field("data", &data)
                     .finish()
             }
             Self::Dense(dense) => f
                 .debug_struct("Tensor")
                 .field("shape", &dense.shape())
+                .field("dtype", &dense.dtype())
                 .finish(),
         }
     }

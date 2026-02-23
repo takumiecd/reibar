@@ -23,6 +23,10 @@ impl<S> KernelArg<S> {
         Self::new(key, ArgValue::I64(value))
     }
 
+    pub fn u8(key: ArgKey, value: u8) -> Self {
+        Self::new(key, ArgValue::U8(value))
+    }
+
     pub fn usize(key: ArgKey, value: usize) -> Self {
         Self::new(key, ArgValue::Usize(value))
     }

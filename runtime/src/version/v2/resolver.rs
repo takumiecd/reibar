@@ -70,5 +70,6 @@ fn kind_code(kind: schema::ArgKind) -> u8 {
         schema::ArgKind::I64 => 2,
         schema::ArgKind::Usize => 3,
         schema::ArgKind::Bool => 4,
+        schema::ArgKind::U8 => 5,
     }
 }

@@ -3,6 +3,7 @@ pub enum ArgKind {
     Storage,
     F32,
     I64,
+    U8,
     Usize,
     Bool,
 }
@@ -15,6 +16,7 @@ pub enum ArgValue<S> {
     Storage(S),
     F32(f32),
     I64(i64),
+    U8(u8),
     Usize(usize),
     Bool(bool),
 }
@@ -25,6 +27,7 @@ impl<S> ArgValue<S> {
             Self::Storage(_) => ArgKind::Storage,
             Self::F32(_) => ArgKind::F32,
             Self::I64(_) => ArgKind::I64,
+            Self::U8(_) => ArgKind::U8,
             Self::Usize(_) => ArgKind::Usize,
             Self::Bool(_) => ArgKind::Bool,
         }
@@ -95,6 +98,25 @@ impl<S> ArgValueAccess<S> for i64 {
     {
         match value {
             ArgValue::I64(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
+impl<S> ArgValueAccess<S> for u8 {
+    type Ref<'a>
+        = &'a u8
+    where
+        S: 'a;
+
+    const KIND: ArgKind = ArgKind::U8;
+
+    fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
+    where
+        S: 'a,
+    {
+        match value {
+            ArgValue::U8(v) => Some(v),
             _ => None,
         }
     }

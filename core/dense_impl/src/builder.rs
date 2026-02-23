@@ -7,6 +7,7 @@ use crate::tensor::DenseTensorImpl;
 pub struct DenseBuilder {
     shape: Vec<usize>,
     execution_tag: ExecutionTag,
+    dtype: DType,
 }
 
 impl DenseBuilder {
@@ -14,6 +15,7 @@ impl DenseBuilder {
         Self {
             shape,
             execution_tag: ExecutionTag::Cpu,
+            dtype: DType::F32,
         }
     }
 
@@ -22,12 +24,17 @@ impl DenseBuilder {
         self
     }
 
+    pub fn with_dtype(mut self, dtype: DType) -> Self {
+        self.dtype = dtype;
+        self
+    }
+
     pub fn build(self) -> Result<DenseTensorImpl, DenseBuildError> {
         let expected = element_count(&self.shape)?;
         let bytes = expected
-            .checked_mul(std::mem::size_of::<f32>())
+            .checked_mul(self.dtype.size_bytes())
             .ok_or(DenseBuildError::ShapeOverflow)?;
-        let request = StorageRequest::new(bytes, DType::F32);
+        let request = StorageRequest::new(bytes, self.dtype);
         let storage_context = StorageContext::from_execution_tag(self.execution_tag);
         let storage = Storage::allocate(self.execution_tag, &storage_context, request)
             .map_err(DenseBuildError::StorageAlloc)?;

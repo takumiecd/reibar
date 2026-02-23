@@ -1,4 +1,6 @@
+use crate::Scalar;
+
 pub trait FillOp<T> {
     type Error;
-    fn fill_inplace(&self, tensor: &mut T, value: f32) -> Result<(), Self::Error>;
+    fn fill_inplace(&self, tensor: &mut T, value: Scalar) -> Result<(), Self::Error>;
 }

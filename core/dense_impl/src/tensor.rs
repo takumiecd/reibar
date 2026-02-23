@@ -1,4 +1,6 @@
 use execution::{ExecutionTag, Storage};
+use op_contracts::Scalar;
+use schema::DType;
 
 #[derive(Clone)]
 pub struct DenseTensorImpl {
@@ -53,6 +55,10 @@ impl DenseTensorImpl {
         self.storage.tag()
     }
 
+    pub fn dtype(&self) -> DType {
+        self.storage.dtype()
+    }
+
     pub fn numel(&self) -> usize {
         self.shape.iter().product()
     }
@@ -63,39 +69,31 @@ impl DenseTensorImpl {
         self.offset == 0 && has_contiguous_strides(&self.shape, &self.strides)
     }
 
-    /// Read all elements in row-major order as `Vec<f32>`. Used by `impl Debug for Tensor`.
-    pub fn read_all_f32(&self) -> Vec<f32> {
+    pub fn read_all_scalars(&self) -> Vec<Scalar> {
         let numel = self.numel();
         let mut result = Vec::with_capacity(numel);
         let is_contiguous = has_contiguous_strides(&self.shape, &self.strides);
+        let dtype = self.dtype();
+        let element_bytes = dtype.size_bytes();
+
         match &self.storage {
             Storage::Cpu(storage) => {
                 storage.buffer().with_read_bytes(|bytes| {
                     if is_contiguous {
                         for i in 0..numel {
-                            let b = (self.offset + i) * std::mem::size_of::<f32>();
-                            result.push(f32::from_ne_bytes([
-                                bytes[b],
-                                bytes[b + 1],
-                                bytes[b + 2],
-                                bytes[b + 3],
-                            ]));
+                            let pos = self.offset + i;
+                            result.push(read_scalar_at(bytes, dtype, element_bytes, pos));
                         }
                     } else {
                         for i in 0..numel {
                             let pos = flat_to_pos(i, &self.shape, &self.strides, self.offset);
-                            let b = pos * std::mem::size_of::<f32>();
-                            result.push(f32::from_ne_bytes([
-                                bytes[b],
-                                bytes[b + 1],
-                                bytes[b + 2],
-                                bytes[b + 3],
-                            ]));
+                            result.push(read_scalar_at(bytes, dtype, element_bytes, pos));
                         }
                     }
                 });
             }
         }
+
         result
     }
 }
@@ -141,6 +139,30 @@ pub(crate) fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
         strides[i] = strides[i + 1] * shape[i + 1];
     }
     strides
+}
+
+fn read_scalar_at(bytes: &[u8], dtype: DType, element_bytes: usize, pos: usize) -> Scalar {
+    let b = pos * element_bytes;
+    match dtype {
+        DType::F32 => Scalar::F32(f32::from_ne_bytes([
+            bytes[b],
+            bytes[b + 1],
+            bytes[b + 2],
+            bytes[b + 3],
+        ])),
+        DType::I64 => Scalar::I64(i64::from_ne_bytes([
+            bytes[b],
+            bytes[b + 1],
+            bytes[b + 2],
+            bytes[b + 3],
+            bytes[b + 4],
+            bytes[b + 5],
+            bytes[b + 6],
+            bytes[b + 7],
+        ])),
+        DType::U8 => Scalar::U8(bytes[b]),
+        DType::Bool => Scalar::Bool(bytes[b] != 0),
+    }
 }
 
 #[cfg(test)]

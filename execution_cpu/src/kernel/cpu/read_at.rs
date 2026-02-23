@@ -63,14 +63,114 @@ pub fn launch(
         )));
     }
 
-    let b = pos * std::mem::size_of::<f32>();
+    let element_bytes = std::mem::size_of::<f32>();
+    let b = pos.checked_mul(element_bytes).ok_or_else(|| {
+        CpuKernelLaunchError::new(format!(
+            "cpu.read_at position {pos} overflows byte offset calculation"
+        ))
+    })?;
+    let e = b.checked_add(element_bytes).ok_or_else(|| {
+        CpuKernelLaunchError::new(format!(
+            "cpu.read_at position {pos} overflows byte range calculation"
+        ))
+    })?;
+
     let value_bytes = in_storage
         .buffer()
-        .with_read_bytes(|src| [src[b], src[b + 1], src[b + 2], src[b + 3]]);
+        .with_read_bytes(|src| {
+            let Some(slot) = src.get(b..e) else {
+                return Err(CpuKernelLaunchError::new(format!(
+                    "cpu.read_at position {pos} (byte range {b}..{e}) is out of bounds for input buffer of {} bytes",
+                    src.len()
+                )));
+            };
+            Ok([slot[0], slot[1], slot[2], slot[3]])
+        })?;
 
     out_storage.buffer().with_write_bytes(|dst| {
-        dst[0..4].copy_from_slice(&value_bytes);
-    });
+        let Some(out_slot) = dst.get_mut(0..element_bytes) else {
+            return Err(CpuKernelLaunchError::new(format!(
+                "cpu.read_at requires output buffer of at least {element_bytes} bytes, got {} bytes",
+                dst.len()
+            )));
+        };
+        out_slot.copy_from_slice(&value_bytes);
+        Ok(())
+    })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use schema::{DType, KernelArg};
+
+    use super::{input_key, launch, output_key, pos_key};
+    use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
+
+    #[test]
+    fn launch_reads_value_at_position() {
+        let mut args = CpuKernelArgs::new();
+        let input = CpuStorage::new(
+            CpuBuffer::new_with_alignment(encode_f32_slice(&[1.0, 2.5, 3.0]), DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        let out = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        args.insert(KernelArg::storage(input_key(), input))
+            .expect("in insertion should succeed");
+        args.insert(KernelArg::storage(output_key(), out.clone()))
+            .expect("out insertion should succeed");
+        args.insert(KernelArg::usize(pos_key(), 1))
+            .expect("pos insertion should succeed");
+
+        launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
+            .expect("read_at launch should succeed");
+
+        let value = out
+            .buffer()
+            .with_read_bytes(|bytes| f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
+        assert_eq!(value, 2.5);
+    }
+
+    #[test]
+    fn launch_rejects_out_of_bounds_position() {
+        let mut args = CpuKernelArgs::new();
+        let input = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 8], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        let out = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        args.insert(KernelArg::storage(input_key(), input))
+            .expect("in insertion should succeed");
+        args.insert(KernelArg::storage(output_key(), out))
+            .expect("out insertion should succeed");
+        args.insert(KernelArg::usize(pos_key(), 2))
+            .expect("pos insertion should succeed");
+
+        let err = launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
+            .expect_err("read_at launch should fail for out-of-bounds position");
+        assert!(err.message().contains("out of bounds"));
+    }
+
+    fn encode_f32_slice(values: &[f32]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(std::mem::size_of_val(values));
+        for value in values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        bytes
+    }
 }

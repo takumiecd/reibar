@@ -107,7 +107,7 @@ mod tests {
             .expect_err("fill launch should fail without value");
         assert!(err.message().contains("value"));
 
-        let missing = ArgKey::new(ArgRole::Param, "value", ArgKind::F32);
+        let missing = ArgKey::new(ArgRole::Param, "value", ArgKind::Scalar(DType::F32));
         assert_eq!(missing, value_key(DType::F32));
     }
 

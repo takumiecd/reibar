@@ -122,8 +122,8 @@ mod tests {
         let cpu_context = CpuKernelContext::new().with_worker_threads(4);
         let mut args = CpuKernelArgs::new().with_context(cpu_context.clone());
         let input_key = ArgKey::new(ArgRole::Input, "dst", ArgKind::Storage);
-        let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
-        let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::F32);
+        let alpha_key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::Scalar(DType::F32));
+        let beta_key = ArgKey::new(ArgRole::Param, "beta", ArgKind::Scalar(DType::F32));
 
         args.insert(KernelArg::storage(
             input_key.clone(),

@@ -66,10 +66,29 @@ fn role_code(role: ArgRole) -> u8 {
 fn kind_code(kind: schema::ArgKind) -> u8 {
     match kind {
         schema::ArgKind::Storage => 0,
-        schema::ArgKind::F32 => 1,
-        schema::ArgKind::I64 => 2,
+        schema::ArgKind::Scalar(schema::DType::F32) => 1,
+        schema::ArgKind::Scalar(schema::DType::I64) => 2,
         schema::ArgKind::Usize => 3,
-        schema::ArgKind::Bool => 4,
-        schema::ArgKind::U8 => 5,
+        schema::ArgKind::Scalar(schema::DType::Bool) => 4,
+        schema::ArgKind::Scalar(schema::DType::U8) => 5,
+        schema::ArgKind::ScalarBuffer => 6,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use schema::ArgKind;
+
+    use super::kind_code;
+
+    #[test]
+    fn kind_code_assignments_are_stable() {
+        assert_eq!(kind_code(ArgKind::Storage), 0);
+        assert_eq!(kind_code(ArgKind::Scalar(schema::DType::F32)), 1);
+        assert_eq!(kind_code(ArgKind::Scalar(schema::DType::I64)), 2);
+        assert_eq!(kind_code(ArgKind::Usize), 3);
+        assert_eq!(kind_code(ArgKind::Scalar(schema::DType::Bool)), 4);
+        assert_eq!(kind_code(ArgKind::Scalar(schema::DType::U8)), 5);
+        assert_eq!(kind_code(ArgKind::ScalarBuffer), 6);
     }
 }

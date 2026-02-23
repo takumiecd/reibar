@@ -1,11 +1,11 @@
+use crate::{DType, Scalar, ScalarBuffer};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ArgKind {
     Storage,
-    F32,
-    I64,
-    U8,
+    ScalarBuffer,
+    Scalar(DType),
     Usize,
-    Bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -14,22 +14,18 @@ pub struct StorageValue;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgValue<S> {
     Storage(S),
-    F32(f32),
-    I64(i64),
-    U8(u8),
+    ScalarBuffer(ScalarBuffer),
+    Scalar(Scalar),
     Usize(usize),
-    Bool(bool),
 }
 
 impl<S> ArgValue<S> {
     pub fn kind(&self) -> ArgKind {
         match self {
             Self::Storage(_) => ArgKind::Storage,
-            Self::F32(_) => ArgKind::F32,
-            Self::I64(_) => ArgKind::I64,
-            Self::U8(_) => ArgKind::U8,
+            Self::ScalarBuffer(_) => ArgKind::ScalarBuffer,
+            Self::Scalar(v) => v.arg_kind(),
             Self::Usize(_) => ArgKind::Usize,
-            Self::Bool(_) => ArgKind::Bool,
         }
     }
 }
@@ -65,20 +61,39 @@ impl<S> ArgValueAccess<S> for StorageValue {
     }
 }
 
-impl<S> ArgValueAccess<S> for f32 {
+impl<S> ArgValueAccess<S> for ScalarBuffer {
     type Ref<'a>
-        = &'a f32
+        = &'a ScalarBuffer
     where
         S: 'a;
 
-    const KIND: ArgKind = ArgKind::F32;
+    const KIND: ArgKind = ArgKind::ScalarBuffer;
 
     fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
     where
         S: 'a,
     {
         match value {
-            ArgValue::F32(v) => Some(v),
+            ArgValue::ScalarBuffer(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
+impl<S> ArgValueAccess<S> for f32 {
+    type Ref<'a>
+        = &'a f32
+    where
+        S: 'a;
+
+    const KIND: ArgKind = ArgKind::Scalar(DType::F32);
+
+    fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
+    where
+        S: 'a,
+    {
+        match value {
+            ArgValue::Scalar(Scalar::F32(v)) => Some(v),
             _ => None,
         }
     }
@@ -90,14 +105,14 @@ impl<S> ArgValueAccess<S> for i64 {
     where
         S: 'a;
 
-    const KIND: ArgKind = ArgKind::I64;
+    const KIND: ArgKind = ArgKind::Scalar(DType::I64);
 
     fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
     where
         S: 'a,
     {
         match value {
-            ArgValue::I64(v) => Some(v),
+            ArgValue::Scalar(Scalar::I64(v)) => Some(v),
             _ => None,
         }
     }
@@ -109,14 +124,14 @@ impl<S> ArgValueAccess<S> for u8 {
     where
         S: 'a;
 
-    const KIND: ArgKind = ArgKind::U8;
+    const KIND: ArgKind = ArgKind::Scalar(DType::U8);
 
     fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
     where
         S: 'a,
     {
         match value {
-            ArgValue::U8(v) => Some(v),
+            ArgValue::Scalar(Scalar::U8(v)) => Some(v),
             _ => None,
         }
     }
@@ -147,14 +162,14 @@ impl<S> ArgValueAccess<S> for bool {
     where
         S: 'a;
 
-    const KIND: ArgKind = ArgKind::Bool;
+    const KIND: ArgKind = ArgKind::Scalar(DType::Bool);
 
     fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
     where
         S: 'a,
     {
         match value {
-            ArgValue::Bool(v) => Some(v),
+            ArgValue::Scalar(Scalar::Bool(v)) => Some(v),
             _ => None,
         }
     }

@@ -5,6 +5,7 @@ mod error;
 mod key;
 mod role;
 mod scalar;
+mod scalar_buffer;
 mod value;
 
 pub use arg::KernelArg;
@@ -14,20 +15,21 @@ pub use error::KernelArgsError;
 pub use key::{ArgKey, ArgTag};
 pub use role::ArgRole;
 pub use scalar::Scalar;
+pub use scalar_buffer::ScalarBuffer;
 pub use value::{ArgKind, ArgValue, ArgValueAccess, StorageValue};
 
 #[cfg(test)]
 mod tests {
     use super::{
         ArgKey, ArgKind, ArgRole, DType, KernelArg, KernelArgs, KernelArgsError, Scalar,
-        StorageValue,
+        ScalarBuffer, StorageValue,
     };
 
     #[test]
     fn kernel_args_insert_and_require() {
         let mut args = KernelArgs::new();
         let input = ArgKey::new(ArgRole::Input, "dst", ArgKind::Storage);
-        let alpha = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
+        let alpha = ArgKey::new(ArgRole::Param, "alpha", ArgKind::Scalar(DType::F32));
 
         args.insert(KernelArg::storage(input.clone(), ()))
             .expect("storage insertion should succeed");
@@ -59,7 +61,7 @@ mod tests {
     #[test]
     fn kernel_args_detect_type_mismatch() {
         let mut args: KernelArgs<()> = KernelArgs::new();
-        let key = ArgKey::new(ArgRole::Param, "beta", ArgKind::I64);
+        let key = ArgKey::new(ArgRole::Param, "beta", ArgKind::Scalar(DType::I64));
         args.insert(KernelArg::i64(key.clone(), 42))
             .expect("insertion should succeed");
 
@@ -68,8 +70,8 @@ mod tests {
             result,
             Err(KernelArgsError::TypeMismatch {
                 key,
-                expected: super::ArgKind::F32,
-                actual: super::ArgKind::I64,
+                expected: super::ArgKind::Scalar(DType::F32),
+                actual: super::ArgKind::Scalar(DType::I64),
             })
         );
     }
@@ -77,15 +79,15 @@ mod tests {
     #[test]
     fn kernel_args_reject_key_and_value_type_mismatch_on_insert() {
         let mut args: KernelArgs<()> = KernelArgs::new();
-        let key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::F32);
+        let key = ArgKey::new(ArgRole::Param, "alpha", ArgKind::Scalar(DType::F32));
 
         let result = args.insert(KernelArg::i64(key.clone(), 42));
         assert_eq!(
             result,
             Err(KernelArgsError::TypeMismatch {
                 key,
-                expected: ArgKind::F32,
-                actual: ArgKind::I64,
+                expected: ArgKind::Scalar(DType::F32),
+                actual: ArgKind::Scalar(DType::I64),
             })
         );
     }
@@ -93,7 +95,7 @@ mod tests {
     #[test]
     fn kernel_args_insert_and_require_scalar() {
         let mut args: KernelArgs<()> = KernelArgs::new();
-        let key = ArgKey::new(ArgRole::Param, "value", ArgKind::I64);
+        let key = ArgKey::new(ArgRole::Param, "value", ArgKind::Scalar(DType::I64));
 
         args.insert_scalar(key.clone(), Scalar::I64(42))
             .expect("scalar insertion should succeed");
@@ -107,7 +109,7 @@ mod tests {
     #[test]
     fn kernel_args_require_scalar_bytes() {
         let mut args: KernelArgs<()> = KernelArgs::new();
-        let key = ArgKey::new(ArgRole::Param, "value", ArgKind::F32);
+        let key = ArgKey::new(ArgRole::Param, "value", ArgKind::Scalar(DType::F32));
 
         args.insert_scalar(key.clone(), Scalar::F32(3.5))
             .expect("scalar insertion should succeed");
@@ -116,6 +118,67 @@ mod tests {
             .require_scalar_bytes(&key, DType::F32)
             .expect("scalar bytes retrieval should succeed");
         assert_eq!(bytes, 3.5f32.to_ne_bytes().to_vec());
+    }
+
+    #[test]
+    fn kernel_args_insert_and_require_scalar_buffer() {
+        let mut args: KernelArgs<()> = KernelArgs::new();
+        let key = ArgKey::new(ArgRole::Param, "values", ArgKind::ScalarBuffer);
+        let values = ScalarBuffer::from_bytes(
+            DType::I64,
+            [1i64, 2, 3]
+                .into_iter()
+                .flat_map(i64::to_ne_bytes)
+                .collect::<Vec<u8>>(),
+        )
+        .expect("valid scalar buffer should be created");
+
+        args.insert_scalar_buffer(key.clone(), values)
+            .expect("scalar buffer insertion should succeed");
+
+        let buf = args
+            .require_scalar_buffer(&key)
+            .expect("scalar buffer retrieval should succeed");
+        assert_eq!(buf.dtype(), DType::I64);
+        assert_eq!(buf.len(), 3);
+        assert_eq!(buf.scalar_at(1), Some(Scalar::I64(2)));
+    }
+
+    #[test]
+    fn kernel_args_reject_invalid_scalar_buffer_key_kind() {
+        let mut args: KernelArgs<()> = KernelArgs::new();
+        let key = ArgKey::new(ArgRole::Param, "values", ArgKind::Scalar(DType::I64));
+        let values = ScalarBuffer::from_bytes(DType::I64, i64::to_ne_bytes(1).to_vec())
+            .expect("valid scalar buffer should be created");
+
+        let result = args.insert_scalar_buffer(key.clone(), values);
+        assert_eq!(
+            result,
+            Err(KernelArgsError::TypeMismatch {
+                key,
+                expected: ArgKind::Scalar(DType::I64),
+                actual: ArgKind::ScalarBuffer,
+            })
+        );
+    }
+
+    #[test]
+    fn scalar_buffer_validates_len_and_decode() {
+        let valid = ScalarBuffer::new(
+            DType::F32,
+            2,
+            [1.0f32, 2.5f32]
+                .into_iter()
+                .flat_map(f32::to_ne_bytes)
+                .collect(),
+        );
+        assert!(valid.is_some());
+
+        let invalid = ScalarBuffer::new(DType::F32, 2, vec![0u8; 7]);
+        assert!(invalid.is_none());
+
+        let not_aligned = ScalarBuffer::from_bytes(DType::I64, vec![0u8; 7]);
+        assert!(not_aligned.is_none());
     }
 
     #[test]

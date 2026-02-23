@@ -28,12 +28,7 @@ impl DType {
     }
 
     pub fn value_arg_kind(self) -> ArgKind {
-        match self {
-            Self::F32 => ArgKind::F32,
-            Self::I64 => ArgKind::I64,
-            Self::U8 => ArgKind::U8,
-            Self::Bool => ArgKind::Bool,
-        }
+        ArgKind::Scalar(self)
     }
 
     pub fn encode_scalar(self, value: &Scalar) -> Option<Vec<u8>> {

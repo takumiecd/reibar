@@ -1,4 +1,4 @@
-use crate::{ArgKey, ArgValueAccess, DType, KernelArg, KernelArgsError, Scalar};
+use crate::{ArgKey, ArgValueAccess, DType, KernelArg, KernelArgsError, Scalar, ScalarBuffer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KernelArgs<S> {
@@ -64,13 +64,15 @@ impl<S> KernelArgs<S> {
     }
 
     pub fn insert_scalar(&mut self, key: ArgKey, value: Scalar) -> Result<(), KernelArgsError> {
-        let arg = match value {
-            Scalar::F32(v) => KernelArg::f32(key, v),
-            Scalar::I64(v) => KernelArg::i64(key, v),
-            Scalar::U8(v) => KernelArg::u8(key, v),
-            Scalar::Bool(v) => KernelArg::bool(key, v),
-        };
-        self.insert(arg)
+        self.insert(KernelArg::scalar(key, value))
+    }
+
+    pub fn insert_scalar_buffer(
+        &mut self,
+        key: ArgKey,
+        value: ScalarBuffer,
+    ) -> Result<(), KernelArgsError> {
+        self.insert(KernelArg::scalar_buffer(key, value))
     }
 
     pub fn require_scalar(&self, key: &ArgKey, dtype: DType) -> Result<Scalar, KernelArgsError> {
@@ -96,6 +98,10 @@ impl<S> KernelArgs<S> {
                 actual: value.arg_kind(),
             }),
         }
+    }
+
+    pub fn require_scalar_buffer(&self, key: &ArgKey) -> Result<&ScalarBuffer, KernelArgsError> {
+        self.require_as::<ScalarBuffer>(key)
     }
 }
 

@@ -79,14 +79,12 @@ pub fn launch(
             "cpu.read_at invalid view/index metadata: IndicesRankMismatch {{ expected_rank: {expected_rank}, actual_rank: {actual_rank} }}"
         )));
     }
-    let indices = indices_buffer
-        .try_to_vec::<i64>()
-        .map_err(|err| {
-            CpuKernelLaunchError::new(format!(
-                "cpu.read_at requires scalar-buffer arg '{}' to decode as i64 values: {err:?}",
-                indices_key.tag().as_str()
-            ))
-        })?;
+    let indices = indices_buffer.try_to_vec::<i64>().map_err(|err| {
+        CpuKernelLaunchError::new(format!(
+            "cpu.read_at requires scalar-buffer arg '{}' to decode as i64 values: {err:?}",
+            indices_key.tag().as_str()
+        ))
+    })?;
     let pos = view_spec.checked_pos_i64(&indices).map_err(|err| {
         CpuKernelLaunchError::new(format!("cpu.read_at invalid view/index metadata: {err:?}"))
     })?;

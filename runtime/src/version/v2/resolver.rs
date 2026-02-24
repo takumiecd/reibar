@@ -72,6 +72,7 @@ fn kind_code(kind: schema::ArgKind) -> u8 {
         schema::ArgKind::Scalar(schema::DType::Bool) => 4,
         schema::ArgKind::Scalar(schema::DType::U8) => 5,
         schema::ArgKind::ScalarBuffer => 6,
+        schema::ArgKind::ViewSpec => 7,
     }
 }
 
@@ -90,5 +91,6 @@ mod tests {
         assert_eq!(kind_code(ArgKind::Scalar(schema::DType::Bool)), 4);
         assert_eq!(kind_code(ArgKind::Scalar(schema::DType::U8)), 5);
         assert_eq!(kind_code(ArgKind::ScalarBuffer), 6);
+        assert_eq!(kind_code(ArgKind::ViewSpec), 7);
     }
 }

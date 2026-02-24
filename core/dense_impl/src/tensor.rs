@@ -1,5 +1,5 @@
 use execution::{ExecutionTag, Storage};
-use schema::{DType, Scalar};
+use schema::{DType, Scalar, ViewSpec, ViewSpecError};
 
 #[derive(Clone)]
 pub struct DenseTensorImpl {
@@ -46,6 +46,10 @@ impl DenseTensorImpl {
         self.offset
     }
 
+    pub fn view_spec(&self) -> Result<ViewSpec, ViewSpecError> {
+        ViewSpec::new(self.shape.clone(), self.strides.clone(), self.offset)
+    }
+
     pub fn storage(&self) -> &Storage {
         &self.storage
     }
@@ -63,7 +67,6 @@ impl DenseTensorImpl {
     }
 
     /// True when the tensor occupies a contiguous, offset-0 region of its storage.
-    /// The fill kernel requires this.
     pub fn is_packed(&self) -> bool {
         self.offset == 0 && has_contiguous_strides(&self.shape, &self.strides)
     }

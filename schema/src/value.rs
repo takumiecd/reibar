@@ -1,4 +1,4 @@
-use crate::{DType, Scalar, ScalarBuffer};
+use crate::{DType, Scalar, ScalarBuffer, ViewSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ArgKind {
@@ -6,6 +6,7 @@ pub enum ArgKind {
     ScalarBuffer,
     Scalar(DType),
     Usize,
+    ViewSpec,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -17,6 +18,7 @@ pub enum ArgValue<S> {
     ScalarBuffer(ScalarBuffer),
     Scalar(Scalar),
     Usize(usize),
+    ViewSpec(ViewSpec),
 }
 
 impl<S> ArgValue<S> {
@@ -26,6 +28,7 @@ impl<S> ArgValue<S> {
             Self::ScalarBuffer(_) => ArgKind::ScalarBuffer,
             Self::Scalar(v) => v.arg_kind(),
             Self::Usize(_) => ArgKind::Usize,
+            Self::ViewSpec(_) => ArgKind::ViewSpec,
         }
     }
 }
@@ -170,6 +173,25 @@ impl<S> ArgValueAccess<S> for bool {
     {
         match value {
             ArgValue::Scalar(Scalar::Bool(v)) => Some(v),
+            _ => None,
+        }
+    }
+}
+
+impl<S> ArgValueAccess<S> for ViewSpec {
+    type Ref<'a>
+        = &'a ViewSpec
+    where
+        S: 'a;
+
+    const KIND: ArgKind = ArgKind::ViewSpec;
+
+    fn get<'a>(value: &'a ArgValue<S>) -> Option<Self::Ref<'a>>
+    where
+        S: 'a,
+    {
+        match value {
+            ArgValue::ViewSpec(v) => Some(v),
             _ => None,
         }
     }

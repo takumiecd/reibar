@@ -189,7 +189,24 @@ impl CpuBuffer {
 }
 
 impl CpuStorage {
+    fn validate_dtype_compatible_len(
+        bytes: usize,
+        dtype: DType,
+    ) -> Result<(), CpuStorageAllocError> {
+        let dtype_size = dtype.size_bytes();
+        if !bytes.is_multiple_of(dtype_size) {
+            return Err(CpuStorageAllocError::InvalidByteSizeForDType {
+                bytes,
+                dtype,
+                dtype_size,
+            });
+        }
+        Ok(())
+    }
+
     pub fn new(buffer: CpuBuffer, dtype: DType) -> Result<Self, CpuStorageAllocError> {
+        Self::validate_dtype_compatible_len(buffer.len_bytes(), dtype)?;
+
         let required_alignment = dtype.alignment();
         let buffer_alignment = buffer.alignment();
         if buffer_alignment < required_alignment {
@@ -207,14 +224,7 @@ impl CpuStorage {
         alignment: Option<usize>,
         dtype: DType,
     ) -> Result<Self, CpuStorageAllocError> {
-        let dtype_size = dtype.size_bytes();
-        if !bytes.is_multiple_of(dtype_size) {
-            return Err(CpuStorageAllocError::InvalidByteSizeForDType {
-                bytes,
-                dtype,
-                dtype_size,
-            });
-        }
+        Self::validate_dtype_compatible_len(bytes, dtype)?;
 
         let requested_alignment = alignment.unwrap_or(dtype.alignment());
         let effective_alignment = requested_alignment.max(dtype.alignment());
@@ -246,5 +256,29 @@ impl execution_contracts::ExecutionStorage for CpuStorage {
 
     fn dtype(&self) -> DType {
         self.dtype()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use schema::DType;
+
+    use super::{CpuBuffer, CpuStorage, CpuStorageAllocError};
+
+    #[test]
+    fn new_rejects_invalid_byte_size_for_dtype() {
+        let buffer = CpuBuffer::new_with_alignment(vec![0u8; 9], DType::I64.alignment())
+            .expect("buffer creation should succeed");
+
+        let err = CpuStorage::new(buffer, DType::I64)
+            .expect_err("typed storage creation should fail for invalid byte size");
+        assert_eq!(
+            err,
+            CpuStorageAllocError::InvalidByteSizeForDType {
+                bytes: 9,
+                dtype: DType::I64,
+                dtype_size: std::mem::size_of::<i64>(),
+            }
+        );
     }
 }

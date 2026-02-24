@@ -1,4 +1,4 @@
-use crate::{ArgKey, ArgValue, Scalar, ScalarBuffer};
+use crate::{ArgKey, ArgValue, Scalar, ScalarBuffer, ViewSpec};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KernelArg<S> {
@@ -25,6 +25,10 @@ impl<S> KernelArg<S> {
 
     pub fn usize(key: ArgKey, value: usize) -> Self {
         Self::new(key, ArgValue::Usize(value))
+    }
+
+    pub fn view_spec(key: ArgKey, value: ViewSpec) -> Self {
+        Self::new(key, ArgValue::ViewSpec(value))
     }
 
     pub fn key(&self) -> &ArgKey {

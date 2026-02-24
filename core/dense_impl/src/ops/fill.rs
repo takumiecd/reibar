@@ -5,16 +5,12 @@ use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{ArgKey, ArgKind, ArgRole, DType, EncodedScalar, KernelArg, Scalar};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, ViewSpecError};
 
-use crate::{DenseTensorImpl, tensor::flat_to_pos};
+use crate::DenseTensorImpl;
 
 pub fn exec(tensor: &mut DenseTensorImpl, value: Scalar) -> Result<(), DenseFillError> {
-    if tensor.is_packed() {
-        return dispatch_fill_kernel(tensor, value);
-    }
-
-    fill_view_cpu(tensor, value)
+    dispatch_fill_kernel(tensor, value)
 }
 
 fn dispatch_fill_kernel(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), DenseFillError> {
@@ -27,6 +23,7 @@ fn dispatch_fill_kernel(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), D
         .insert(KernelArg::storage(output_key(), out))
         .map_err(DenseFillError::KernelArgs)?;
     insert_fill_value_arg(&mut cpu_args, dtype, value)?;
+    insert_fill_view_args(&mut cpu_args, tensor)?;
     let args = KernelArgs::Cpu(cpu_args);
 
     let seed = SeedSpec::V1(V1KeyParts {
@@ -46,58 +43,10 @@ fn dispatch_fill_kernel(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), D
     Ok(())
 }
 
-fn fill_view_cpu(tensor: &DenseTensorImpl, value: Scalar) -> Result<(), DenseFillError> {
-    let dtype = tensor.dtype();
-    let pattern = scalar_pattern(dtype, value)?;
-    let element_bytes = dtype.size_bytes();
-    let numel = tensor.numel();
-    let shape = tensor.shape();
-    let strides = tensor.strides();
-    let offset = tensor.offset();
-
-    let out = match tensor.storage() {
-        Storage::Cpu(storage) => storage.clone(),
-    };
-
-    out.buffer().with_write_bytes(|dst| {
-        for flat in 0..numel {
-            let pos = flat_to_pos(flat, shape, strides, offset);
-            let b = pos
-                .checked_mul(element_bytes)
-                .ok_or(DenseFillError::PositionOverflow { pos, element_bytes })?;
-            let e = b
-                .checked_add(element_bytes)
-                .ok_or(DenseFillError::PositionOverflow { pos, element_bytes })?;
-            let Some(slot) = dst.get_mut(b..e) else {
-                return Err(DenseFillError::ViewOutOfBounds {
-                    pos,
-                    range_start: b,
-                    range_end: e,
-                    buffer_len: dst.len(),
-                });
-            };
-            slot.copy_from_slice(pattern.as_slice());
-        }
-        Ok(())
-    })
-}
-
 #[derive(Debug)]
 pub enum DenseFillError {
-    ScalarDTypeMismatch {
-        tensor_dtype: DType,
-        value: Scalar,
-    },
-    PositionOverflow {
-        pos: usize,
-        element_bytes: usize,
-    },
-    ViewOutOfBounds {
-        pos: usize,
-        range_start: usize,
-        range_end: usize,
-        buffer_len: usize,
-    },
+    ScalarDTypeMismatch { tensor_dtype: DType, value: Scalar },
+    InvalidViewSpec(ViewSpecError),
     DispatcherPoisoned,
     KernelArgs(schema::KernelArgsError),
     Dispatch(DispatchError),
@@ -109,6 +58,10 @@ fn output_key() -> ArgKey {
 
 fn value_key(dtype: DType) -> ArgKey {
     ArgKey::new(ArgRole::Param, "value", dtype.value_arg_kind())
+}
+
+fn view_spec_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "view_spec", ArgKind::ViewSpec)
 }
 
 fn dense_dispatcher() -> &'static Mutex<Dispatcher> {
@@ -147,13 +100,15 @@ fn insert_fill_value_arg(
         .map_err(DenseFillError::KernelArgs)
 }
 
-fn scalar_pattern(dtype: DType, value: Scalar) -> Result<EncodedScalar, DenseFillError> {
-    if let Some(encoded) = dtype.encode_scalar(&value) {
-        Ok(encoded)
-    } else {
-        Err(DenseFillError::ScalarDTypeMismatch {
-            tensor_dtype: dtype,
-            value,
-        })
-    }
+fn insert_fill_view_args(
+    cpu_args: &mut CpuKernelArgs,
+    tensor: &DenseTensorImpl,
+) -> Result<(), DenseFillError> {
+    let view_spec = tensor
+        .view_spec()
+        .map_err(DenseFillError::InvalidViewSpec)?;
+    cpu_args
+        .insert(KernelArg::view_spec(view_spec_key(), view_spec))
+        .map_err(DenseFillError::KernelArgs)?;
+    Ok(())
 }

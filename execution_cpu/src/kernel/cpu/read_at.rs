@@ -1,4 +1,4 @@
-use schema::{ArgKey, ArgKind, ArgRole, StorageValue};
+use schema::{ArgKey, ArgKind, ArgRole, DType, StorageValue, ViewSpec};
 
 use crate::{CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError};
 
@@ -10,8 +10,12 @@ pub fn output_key() -> ArgKey {
     ArgKey::new(ArgRole::Output, "out", ArgKind::Storage)
 }
 
-pub fn pos_key() -> ArgKey {
-    ArgKey::new(ArgRole::Param, "pos", ArgKind::Usize)
+pub fn view_spec_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "view_spec", ArgKind::ViewSpec)
+}
+
+pub fn indices_key() -> ArgKey {
+    ArgKey::new(ArgRole::Param, "indices", ArgKind::ScalarBuffer)
 }
 
 pub fn launch(
@@ -20,7 +24,8 @@ pub fn launch(
 ) -> Result<(), CpuKernelLaunchError> {
     let in_key = input_key();
     let out_key = output_key();
-    let pos_key = pos_key();
+    let view_key = view_spec_key();
+    let indices_key = indices_key();
 
     let in_storage = args
         .args()
@@ -42,11 +47,46 @@ pub fn launch(
             ))
         })?;
 
-    let pos = *args.args().require_as::<usize>(&pos_key).map_err(|err| {
+    let view_spec = args
+        .args()
+        .require_as::<ViewSpec>(&view_key)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.read_at requires view-spec param arg '{}': {err:?}",
+                view_key.tag().as_str()
+            ))
+        })?;
+    let indices_buffer = args
+        .args()
+        .require_scalar_buffer(&indices_key)
+        .map_err(|err| {
+            CpuKernelLaunchError::new(format!(
+                "cpu.read_at requires scalar-buffer param arg '{}': {err:?}",
+                indices_key.tag().as_str()
+            ))
+        })?;
+    if indices_buffer.dtype() != DType::I64 {
+        return Err(CpuKernelLaunchError::new(format!(
+            "cpu.read_at requires scalar-buffer arg '{}' to decode as i64 values: DTypeMismatch {{ expected: I64, actual: {:?} }}",
+            indices_key.tag().as_str(),
+            indices_buffer.dtype()
+        )));
+    }
+    let expected_rank = view_spec.rank();
+    let actual_rank = indices_buffer.len();
+    if actual_rank != expected_rank {
+        return Err(CpuKernelLaunchError::new(format!(
+            "cpu.read_at invalid view/index metadata: IndicesRankMismatch {{ expected_rank: {expected_rank}, actual_rank: {actual_rank} }}"
+        )));
+    }
+    let indices = indices_buffer.try_to_vec::<i64>().map_err(|err| {
         CpuKernelLaunchError::new(format!(
-            "cpu.read_at requires usize param arg '{}': {err:?}",
-            pos_key.tag().as_str()
+            "cpu.read_at requires scalar-buffer arg '{}' to decode as i64 values: {err:?}",
+            indices_key.tag().as_str()
         ))
+    })?;
+    let pos = view_spec.checked_pos_i64(&indices).map_err(|err| {
+        CpuKernelLaunchError::new(format!("cpu.read_at invalid view/index metadata: {err:?}"))
     })?;
 
     if in_storage.dtype() != out_storage.dtype() {
@@ -97,9 +137,9 @@ pub fn launch(
 
 #[cfg(test)]
 mod tests {
-    use schema::{DType, KernelArg};
+    use schema::{DType, KernelArg, ScalarBuffer, ViewSpec};
 
-    use super::{input_key, launch, output_key, pos_key};
+    use super::{indices_key, input_key, launch, output_key, view_spec_key};
     use crate::{CpuBuffer, CpuKernelArgs, CpuKernelLaunchConfig, CpuStorage};
 
     #[test]
@@ -124,8 +164,17 @@ mod tests {
             .expect("in insertion should succeed");
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
-        args.insert(KernelArg::usize(pos_key(), 1))
-            .expect("pos insertion should succeed");
+        args.insert(KernelArg::view_spec(
+            view_spec_key(),
+            ViewSpec::new(vec![3], vec![1], 0).expect("view metadata should be valid"),
+        ))
+        .expect("view spec insertion should succeed");
+        args.insert(KernelArg::scalar_buffer(
+            indices_key(),
+            ScalarBuffer::from_bytes(DType::I64, encode_i64_slice(&[1]))
+                .expect("indices metadata should be valid"),
+        ))
+        .expect("indices insertion should succeed");
 
         launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
             .expect("read_at launch should succeed");
@@ -155,12 +204,21 @@ mod tests {
             .expect("in insertion should succeed");
         args.insert(KernelArg::storage(output_key(), out))
             .expect("out insertion should succeed");
-        args.insert(KernelArg::usize(pos_key(), 2))
-            .expect("pos insertion should succeed");
+        args.insert(KernelArg::view_spec(
+            view_spec_key(),
+            ViewSpec::new(vec![2], vec![1], 0).expect("view metadata should be valid"),
+        ))
+        .expect("view spec insertion should succeed");
+        args.insert(KernelArg::scalar_buffer(
+            indices_key(),
+            ScalarBuffer::from_bytes(DType::I64, encode_i64_slice(&[2]))
+                .expect("indices metadata should be valid"),
+        ))
+        .expect("indices insertion should succeed");
 
         let err = launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
             .expect_err("read_at launch should fail for out-of-bounds position");
-        assert!(err.message().contains("out of bounds"));
+        assert!(err.message().contains("IndexOutOfBounds"));
     }
 
     #[test]
@@ -182,8 +240,17 @@ mod tests {
             .expect("in insertion should succeed");
         args.insert(KernelArg::storage(output_key(), out.clone()))
             .expect("out insertion should succeed");
-        args.insert(KernelArg::usize(pos_key(), 1))
-            .expect("pos insertion should succeed");
+        args.insert(KernelArg::view_spec(
+            view_spec_key(),
+            ViewSpec::new(vec![3], vec![1], 0).expect("view metadata should be valid"),
+        ))
+        .expect("view spec insertion should succeed");
+        args.insert(KernelArg::scalar_buffer(
+            indices_key(),
+            ScalarBuffer::from_bytes(DType::I64, encode_i64_slice(&[1]))
+                .expect("indices metadata should be valid"),
+        ))
+        .expect("indices insertion should succeed");
 
         launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
             .expect("read_at launch should succeed");
@@ -194,6 +261,42 @@ mod tests {
             ])
         });
         assert_eq!(value, 22);
+    }
+
+    #[test]
+    fn launch_rejects_indices_rank_mismatch() {
+        let mut args = CpuKernelArgs::new();
+        let input = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        let out = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        args.insert(KernelArg::storage(input_key(), input))
+            .expect("in insertion should succeed");
+        args.insert(KernelArg::storage(output_key(), out))
+            .expect("out insertion should succeed");
+        args.insert(KernelArg::view_spec(
+            view_spec_key(),
+            ViewSpec::new(vec![1, 1], vec![1, 1], 0).expect("view metadata should be valid"),
+        ))
+        .expect("view spec insertion should succeed");
+        args.insert(KernelArg::scalar_buffer(
+            indices_key(),
+            ScalarBuffer::from_bytes(DType::I64, encode_i64_slice(&[0]))
+                .expect("indices metadata should be valid"),
+        ))
+        .expect("indices insertion should succeed");
+
+        let err = launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
+            .expect_err("read_at launch should fail for indices rank mismatch");
+        assert!(err.message().contains("IndicesRankMismatch"));
     }
 
     fn encode_f32_slice(values: &[f32]) -> Vec<u8> {

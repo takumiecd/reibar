@@ -104,7 +104,9 @@ fn insert_fill_view_args(
     cpu_args: &mut CpuKernelArgs,
     tensor: &DenseTensorImpl,
 ) -> Result<(), DenseFillError> {
-    let view_spec = tensor.view_spec().map_err(DenseFillError::InvalidViewSpec)?;
+    let view_spec = tensor
+        .view_spec()
+        .map_err(DenseFillError::InvalidViewSpec)?;
     cpu_args
         .insert(KernelArg::view_spec(view_spec_key(), view_spec))
         .map_err(DenseFillError::KernelArgs)?;

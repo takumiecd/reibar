@@ -7,9 +7,7 @@ use runtime::{
     DispatchApi, DispatchError, Dispatcher, KernelRegistryConfig, KeyVersion, OpTag, SeedSpec,
     V1KeyParts,
 };
-use schema::{
-    ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, ScalarBuffer, ViewSpecError,
-};
+use schema::{ArgKey, ArgKind, ArgRole, DType, KernelArg, Scalar, ScalarBuffer, ViewSpecError};
 
 use crate::DenseTensorImpl;
 

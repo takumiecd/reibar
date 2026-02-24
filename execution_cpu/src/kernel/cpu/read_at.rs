@@ -1,4 +1,4 @@
-use schema::{ArgKey, ArgKind, ArgRole, StorageValue, ViewSpec};
+use schema::{ArgKey, ArgKind, ArgRole, DType, StorageValue, ViewSpec};
 
 use crate::{CpuKernelArgs, CpuKernelLaunchConfig, CpuKernelLaunchError};
 
@@ -56,7 +56,7 @@ pub fn launch(
                 view_key.tag().as_str()
             ))
         })?;
-    let indices = args
+    let indices_buffer = args
         .args()
         .require_scalar_buffer(&indices_key)
         .map_err(|err| {
@@ -64,7 +64,22 @@ pub fn launch(
                 "cpu.read_at requires scalar-buffer param arg '{}': {err:?}",
                 indices_key.tag().as_str()
             ))
-        })?
+        })?;
+    if indices_buffer.dtype() != DType::I64 {
+        return Err(CpuKernelLaunchError::new(format!(
+            "cpu.read_at requires scalar-buffer arg '{}' to decode as i64 values: DTypeMismatch {{ expected: I64, actual: {:?} }}",
+            indices_key.tag().as_str(),
+            indices_buffer.dtype()
+        )));
+    }
+    let expected_rank = view_spec.rank();
+    let actual_rank = indices_buffer.len();
+    if actual_rank != expected_rank {
+        return Err(CpuKernelLaunchError::new(format!(
+            "cpu.read_at invalid view/index metadata: IndicesRankMismatch {{ expected_rank: {expected_rank}, actual_rank: {actual_rank} }}"
+        )));
+    }
+    let indices = indices_buffer
         .try_to_vec::<i64>()
         .map_err(|err| {
             CpuKernelLaunchError::new(format!(
@@ -248,6 +263,42 @@ mod tests {
             ])
         });
         assert_eq!(value, 22);
+    }
+
+    #[test]
+    fn launch_rejects_indices_rank_mismatch() {
+        let mut args = CpuKernelArgs::new();
+        let input = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        let out = CpuStorage::new(
+            CpuBuffer::new_with_alignment(vec![0u8; 4], DType::F32.alignment())
+                .expect("aligned buffer creation should succeed"),
+            DType::F32,
+        )
+        .expect("typed storage creation should succeed");
+        args.insert(KernelArg::storage(input_key(), input))
+            .expect("in insertion should succeed");
+        args.insert(KernelArg::storage(output_key(), out))
+            .expect("out insertion should succeed");
+        args.insert(KernelArg::view_spec(
+            view_spec_key(),
+            ViewSpec::new(vec![1, 1], vec![1, 1], 0).expect("view metadata should be valid"),
+        ))
+        .expect("view spec insertion should succeed");
+        args.insert(KernelArg::scalar_buffer(
+            indices_key(),
+            ScalarBuffer::from_bytes(DType::I64, encode_i64_slice(&[0]))
+                .expect("indices metadata should be valid"),
+        ))
+        .expect("indices insertion should succeed");
+
+        let err = launch(&args, &CpuKernelLaunchConfig::new("cpu.read_at"))
+            .expect_err("read_at launch should fail for indices rank mismatch");
+        assert!(err.message().contains("IndicesRankMismatch"));
     }
 
     fn encode_f32_slice(values: &[f32]) -> Vec<u8> {
